@@ -1,0 +1,5 @@
+# COPY/PASTE TO CODEX — phase P0
+
+**Model:** GPT-6.2 Sol High (short task). **Owner:** master.
+
+Read `AGENTS.md`, `docs/02_DECISIONS_AND_APPROVAL.md`, `docs/03_ARCHITECTURE_AND_INVARIANTS.md`, `docs/04_PHASE_MAP_AND_OWNERSHIP.md`, and `phases/P0_MASTER_BASELINE.md`. The user **has already approved** the plan on 2026-11-21. Do not ask again. The Mac is an M4 Air, there is an SSH-reachable spare Ubuntu physical laptop, and there are zero Ubuntu VMs. Perform **only P0**: verify Git baseline, inventory Ubuntu laptop CPU/RAM/disk/KVM support via safe read-only SSH, choose two real guests (prefer both on Ubuntu laptop via KVM/libvirt), record guest networking/SSH-through-jump-host design, freeze `p/c/q` and gRPC/HTTP interfaces, establish two disjoint worktrees for Agent A and Agent B, record precise file permissions, and release Wave 1. No code changes, no privileged installation/provisioning without separate permission, no slides/recording/verbal submission script. Provide brief baseline and gate results.

@@ -1,0 +1,31 @@
+name: mediadock-producer
+
+services:
+  producer:
+    image: "mediadock/producer:${IMAGE_REVISION:?set the full source Git commit SHA}"
+    pull_policy: never
+    restart: "no"
+    init: true
+    cpus: 1.0
+    mem_limit: 256m
+    volumes:
+      - type: bind
+        source: "${SAMPLES_DIR:-../samples}"
+        target: /samples
+        read_only: true
+        bind:
+          create_host_path: false
+    command:
+      - --p
+      - "${PRODUCER_COUNT:-3}"
+      - --source-root
+      - /samples
+      - --server
+      - "${CONSUMER_PRIVATE_IP:?set the consumer guest private IPv4 address}:${GRPC_PORT:-50051}"
+      - --deadline-sec
+      - "${UPLOAD_DEADLINE_SEC:-180}"
+    logging:
+      driver: local
+      options:
+        max-size: "5m"
+        max-file: "2"

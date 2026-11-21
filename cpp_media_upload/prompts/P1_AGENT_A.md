@@ -1,0 +1,5 @@
+# COPY/PASTE TO CODEX — phase P1 / Agent A
+
+**Model:** GPT-6.2 Sol Medium. **Branch:** codex/agent-a. **Parallel permitted:** Agent B P3.
+
+You are **Agent A**, a child of the MediaDock master. NEVER launch more subagents. Read `AGENTS.md`, `docs/03_ARCHITECTURE_AND_INVARIANTS.md`, and `phases/P1_AGENT_A_BUILD_TESTS.md`; inspect actual affected files only. Approval is a prerequisite. Fix always-on tests and Release assertion side effects, stabilize CMake full build with actual Ubuntu C++ gRPC/Protobuf/Drogon deps. Own `tests/core_tests.cpp`, `tests/pipeline_smoke.cpp`, `CMakeLists.txt`, and only core support strictly required. Do NOT edit B's Docker/HTTP/frontend/demo files or master README/TODO. Execute Debug and Release tests and full app build where dependencies exist. No false PASS for environment-unavailable tasks. Commit on your own branch and return <=250 words: changed files, test commands+results, build dependency findings, blockers, commit hash. Stop after P1. No slides, recording or verbal submission script.

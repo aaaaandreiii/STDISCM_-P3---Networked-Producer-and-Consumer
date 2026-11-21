@@ -66,6 +66,7 @@ drogon::HttpResponsePtr serve_file(const drogon::HttpRequestPtr& req,
     return failure(drogon::k404NotFound, "Media file unavailable");
   const auto size = fs::file_size(file);
   const auto range_text = req->getHeader("range");
+  // Drogon skips automatic compression for CT_CUSTOM, preserving byte ranges.
   drogon::HttpResponsePtr resp;
   if (!range_text.empty()) {
     const auto range = parse_range(range_text, size);
@@ -87,7 +88,6 @@ drogon::HttpResponsePtr serve_file(const drogon::HttpRequestPtr& req,
   }
   resp->addHeader("Accept-Ranges", "bytes");
   resp->addHeader("Cache-Control", "private, max-age=60");
-  resp->setAllowCompression(false);
   return resp;
 }
 }
