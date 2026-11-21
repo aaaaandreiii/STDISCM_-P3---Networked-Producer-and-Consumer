@@ -74,10 +74,11 @@ try:
 except OSError as exc:
     print('KVM API query:', exc)
 KVM
-apt-cache policy qemu-system-x86 libvirt-daemon-system libvirt-clients virtinst qemu-utils docker.io docker-compose-v2 docker-ce docker-compose-plugin
+apt-cache policy qemu-system-x86 libvirt-daemon-system libvirt-clients virt-install virtinst qemu-utils docker.io docker-compose-v2 docker-ce docker-compose-plugin
 for tool in virsh qemu-system-x86_64 docker virt-host-validate; do command -v "$tool" || printf '%s absent\n' "$tool"; done
 ss -H -ltn '( sport = :22 or sport = :50051 or sport = :8080 or sport = :50052 or sport = :8081 )' | awk '{print "TCP listener:", $4}'
 ip -br link
+ip -4 route
 sysctl -n net.ipv4.ip_forward
 AUDIT
 ```

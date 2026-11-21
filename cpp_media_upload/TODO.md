@@ -1,6 +1,6 @@
-# MediaDock implementation TODO (APPROVED; Codex implementation pending)
+# MediaDock implementation TODO
 
-**Status:** `APPROVED_FOR_PHASED_CODEX_IMPLEMENTATION` (user approval 2026-11-21). No source, VM, Docker or demo script has been implemented by this planning package. These checkboxes are acceptance gates; mark complete only when observed, with evidence/commit references.
+**Status:** `APPROVED_FOR_PHASED_CODEX_IMPLEMENTATION` (user approval 2026-11-21). P1 and P3 implementation branches are tracked in the P0 baseline report. These checkboxes are acceptance gates; mark complete only when observed, with evidence/commit references.
 
 ## Approval / prerequisites
 
@@ -18,9 +18,9 @@
 ## Codex implementation phases
 
 - [x] **P0 development gate** Source, worktrees, reviewed inventory and contracts recorded. Wave 1 released. Remaining host and deployment checks are tracked above. See [P0 baseline report](docs/P0_BASELINE_REPORT.md).
-- [ ] **P1** Fix test side effects, assert-vs-Release behavior, full build/dependency reliability — Agent A.
+- [ ] **P1** Always-on tests and CMake fixes implemented on Agent A’s branch. Full Ubuntu build and CTest gate pending.
 - [ ] **P2** gRPC concurrency/producer/consumer correctness and real integration tests — Agent A.
-- [ ] **P3** Docker images, Compose stacks, persistent volumes and two-VM network documentation — Agent B.
+- [ ] **P3** Docker/Compose and VM setup implemented on Agent B’s branch. Ubuntu image build and guest rollout gates pending.
 - [ ] **P4** Drogon HTTP, gallery preview/playback/browser+Range verification — Agent B.
 - [ ] **P5** Fully automated one-command `./demo.sh`, reproducible fixtures, idempotent reruns and failure diagnostics — Agent B.
 - [ ] **P6** Cross-VM reliability, restart/partial upload recovery, saturation + duplicate race validation — Agent A, master integration.

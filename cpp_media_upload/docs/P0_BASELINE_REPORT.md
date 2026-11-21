@@ -72,3 +72,12 @@ for full in OFF ON; do
   done
 done
 ```
+
+## Wave 1 results
+
+| Phase | Local verification | Integration gate |
+|---|---|---|
+| P1 · `codex/agent-a` · `c9fabca` | Direct Apple Clang core test builds passed with `-O0 -g` and with `-O2 -DNDEBUG`. The agent's separate diagnostic runs passed with `-O3 -DNDEBUG` as well. The scratch pipeline runs used an alternate logger for the Mac standard library and reached READY with a 2-second preview. Missing tools returned the expected 77, fixture failure returned 1, and an intentionally disabled CHECK was detected in Release. | Ubuntu CMake/Ninja/CTest in both build modes, a full application build, and the Drogon compatibility fix are pending. |
+| P3 · `codex/agent-b` · `c51967c` | `bash tests/e2e/docker-config.sh` exited 0 with Docker Compose 5.2.0. It verified both image targets, private port bindings, isolated volumes and the one-shot producer. The VM setup command examples and Docker test scripts passed `bash -n`. | Docker image build and runtime health, data persistence, KVM guests, guest routing, managed tunnel and load remain unverified. The Mac Docker CLI has no running daemon, and the Acer's Docker install requires separate approval. |
+
+Wave 1 implementation branches remain separate pending the combined Ubuntu compile and image gate. Preserve the shared HTTP ownership when resolving the Drogon compatibility issue and verify byte range responses in the actual build environment. The [Wave 1 integration checklist](08_EVIDENCE_AND_HANDOFF.md#master-merge-gate-after-wave-1) records the remaining tests. The P3 branch's `docs/VM_SETUP.md` contains the exact protected commands for review. No privileged changes were issued.
