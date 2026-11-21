@@ -95,8 +95,8 @@ class Suite:
         return path
 
     @contextlib.contextmanager
-    def consumer(self, name, workers, capacity, slots=8, delay=0):
-        server = Consumer(self, name, workers, capacity, slots, delay)
+    def consumer(self, name, workers, capacity, slots=8, delay=0, **options):
+        server = Consumer(self, name, workers, capacity, slots, delay, **options)
         try:
             server.start()
             yield server
@@ -109,13 +109,15 @@ class Suite:
 
 
 class Consumer:
-    def __init__(self, suite, name, workers, capacity, slots, delay):
+    def __init__(self, suite, name, workers, capacity, slots, delay, *,
+                 data=None, env=None, max_mb=4, ffmpeg_timeout=20):
         self.suite = suite
         self.name = name
         self.workers = workers
         self.capacity = capacity
         self.slots = slots
-        self.data = suite.work / f"{name}-data"
+        self.data = data if data is not None else suite.work / f"{name}-data"
+        self.env = env
         self.log = suite.evidence / f"{name}-consumer.log"
         self.grpc_port, self.http_port = port_pair()
         self.target = f"127.0.0.1:{self.grpc_port}"
@@ -125,7 +127,7 @@ class Consumer:
             suite.build / "media_consumer", "--grpc-bind", self.target, "--http-host", "127.0.0.1",
             "--http-port", str(self.http_port), "--data", self.data, "--web", suite.web,
             "--c", str(workers), "--q", str(capacity), "--max-inflight", str(slots),
-            "--max-mb", "4", "--compress", "off", "--ffmpeg-timeout", "20",
+            "--max-mb", str(max_mb), "--compress", "off", "--ffmpeg-timeout", str(ffmpeg_timeout),
         ]
         if delay:
             self.command.extend(["--demo-delay-ms", str(delay)])
@@ -133,7 +135,7 @@ class Consumer:
     def start(self):
         self.suite.note("+ " + shlex.join(map(str, self.command)))
         with self.log.open("w") as log:
-            self.process = subprocess.Popen(self.command, stdout=log, stderr=subprocess.STDOUT)
+            self.process = subprocess.Popen(self.command, stdout=log, stderr=subprocess.STDOUT, env=self.env)
 
         def healthy():
             require(self.process.poll() is None, f"Consumer exited on start. See {self.log}")
