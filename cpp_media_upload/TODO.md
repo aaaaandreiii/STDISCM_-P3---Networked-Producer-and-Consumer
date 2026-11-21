@@ -1,6 +1,6 @@
 # MediaDock implementation TODO
 
-**Status:** `APPROVED_FOR_PHASED_CODEX_IMPLEMENTATION` (user approval 2026-11-21). P1 and P3 were merged into `codex/integration`. The P0 baseline report records the passing native and image gates. Wave 2 is approved. These checkboxes are acceptance gates; mark complete only when observed, with evidence/commit references.
+**Status:** `APPROVED_FOR_PHASED_CODEX_IMPLEMENTATION` (user approval 2026-11-21). P1 and P3 were merged into `codex/integration`. The P0 baseline report records the passing native and image gates and the Wave 2 loopback and browser checks. These checkboxes are acceptance gates; mark complete only when observed, with evidence/commit references.
 
 ## Approval / prerequisites
 
@@ -25,9 +25,9 @@
 
 - [x] **P0 development gate** Source, worktrees, reviewed inventory and contracts recorded. Wave 1 released. Remaining host and deployment checks are tracked above. See [P0 baseline report](docs/P0_BASELINE_REPORT.md).
 - [x] **P1** Always-on tests and CMake fixes merged. Full Acer Ubuntu Debug and Release builds and CTest verified for `917a621`.
-- [ ] **P2** gRPC concurrency/producer/consumer correctness and real integration tests — Agent A.
+- [x] **P2** gRPC and concurrency tests passed on Acer loopback, including bounded shutdown and queue draining. Cross-VM G01 remains pending.
 - [ ] **P3** Docker/Compose and VM setup merged. Ubuntu image build gate passed. Guest rollout remains pending Approval 3.
-- [ ] **P4** Drogon HTTP, gallery preview/playback/browser+Range verification — Agent B.
+- [x] **P4** HTTP Range and READY-only gallery checks passed on Acer loopback. Headful Chrome verified preview and full playback over an isolated tunnel. Cross-VM acceptance remains pending.
 - [ ] **P5** One-command `./demo.sh` lifecycle, seeded demo, idempotent reruns, graceful stop and read-only status — Agent B.
 - [ ] **P6** Cross-VM reliability, restart/partial upload recovery, saturation + duplicate race validation — Agent A, master integration.
 - [ ] **P7** Master merge, two-VM full acceptance, final README/build/test docs, offline demo rehearsal and freeze.

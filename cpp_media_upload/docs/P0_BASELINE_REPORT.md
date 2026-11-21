@@ -182,3 +182,26 @@ The Noble builder ran two CTest cases with both passed. The producer log recorde
 The lowest sampled available RAM was 4.79 GiB for producer and 5.22 GiB for consumer. Minimum free disk was 47.74 and 47.14 GiB respectively, above the 18 GiB cutoff and 15 GiB reserve. All 81 samples recorded zero swap use or movement and zero full-memory pressure in the 10-second PSI metric. Docker's reported total image size rose from 1.602 to 2.395 GB and build cache from 503.4 MB to 1.749 GB. Docker counts remained five running containers and one local volume. Both full running-container ID sets matched, and every baseline container's state, start time, restart count and reported health matched byte-for-byte. The other project's application-level health was not tested.
 
 Acer evidence is in `build-image-evidence.csVIPo` under the staged release. Selected logs without unrelated container identities were copied to `.demo-evidence/approval2-917a621/csVIPo/`. The previous failed run remains intact. Approval 2 is complete. Wave 2 authorizes Agent A P2 and Agent B P4 in their existing worktrees. Actual guests, networking and two-VM verification remain behind Approval 3.
+
+### GitHub publication and Wave 2 integration tests
+
+GitHub `main` was published and independently read back at `d764741bffc22924a496cc9dd1a9ec3cc4ec4eda`. That merge contains the verified native and image gates while retaining the prior main history. The two Wave 2 workers then ran in the same existing worktrees and took turns on the Acer with a shared `flock` and one CMake build job.
+
+P2 `43b2b9b` and P4 `6509a79` were merged sequentially into `codex/integration` candidate `042e8a66bdf1df2816730db6faa4a9ff605bfa54`. Their changed paths were disjoint. The candidate keeps the same Protobuf and HTTP contracts and Docker configuration.
+
+| Check on candidate | Observed result |
+|---|---|
+| Acer native full Release CMake/Ninja | Configure and 20 build steps succeeded using `-DBUILD_FULL_APP=ON -DBUILD_TESTING=ON` and `--parallel 1`. |
+| CTest | Exit 0. Core and pipeline 2/2, zero skips. |
+| gRPC integration | G02–G08 passed on loopback, including duplicate races, cancellation/deadline, input validation and slot reuse. Overload reached queue depth 2, rejected three newer uploads with `QUEUE_FULL`, and drained three accepted jobs. An unfinished stream during SIGTERM was cancelled, and the consumer exited in 5.052 seconds without a partial file or database row. |
+| HTTP acceptance | Exit 0 on the combined candidate. Real READY upload, MIME/cache, precise Range 206 bodies and 416 errors passed. |
+| Headful browser on P4 `6509a79` | HTTP and browser wrappers exited 0 with Chrome 153.0.8010.55 over a dedicated Mac-to-Acer loopback tunnel. The muted 10-second hover preview played and stopped on pointer exit. The 14-second full video sought to 11.5 seconds and advanced to 11.75 seconds. Escape closed the modal. READY refresh, recovery from an API failure, and literal rendering of the markup-shaped filename passed. |
+| Cross-VM G01 and deployment acceptance | NOT RUN. Approval 3 is still required for provisioning. |
+
+The combined run used `python3 tests/integration/grpc_integration.py build evidence/grpc` after compiling the test client with the command in that file's docstring. The first streamed SSH wrapper exited 127 after the gRPC suite completed because the next shell command lost its first character on shared stdin. The HTTP command then ran successfully against the same build with redirected stdin.
+
+```bash
+python3 tests/e2e/http-acceptance.py build evidence/http "$http_port" "$grpc_port" </dev/null
+```
+
+The resumed wrapper recorded gate exit 0. The Acer finished with 5.3 GiB available RAM, zero swap use and about 48 GiB free space. Docker and containerd remained active, and the same database process was still present. Selected combined logs are in `.demo-evidence/wave2-042e8a6/`. The P4 reproduction steps are in `tests/e2e/browser-README.md`. The Wave 2 commits and this report are on local `codex/integration`.
