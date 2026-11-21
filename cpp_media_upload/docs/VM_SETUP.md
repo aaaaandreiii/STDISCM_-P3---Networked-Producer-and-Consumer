@@ -52,7 +52,20 @@ The host package step does not grant broad libvirt or Docker group membership. S
 
 Review the guest command templates below after verifying the daemon and existing network inventory. Select the approved guest SSH identity and operator administration path before first boot. Reserve host storage only on the current Ubuntu filesystem. These templates require the reviewed live values and exact authorization before applying any host network, VM, guest Docker or SSH changes.
 
-Check `sudo virsh -c qemu:///system net-list --all`, `sudo virsh -c qemu:///system list --all`, and the Acer's routing table. Select an unused RFC 1918 /24 and three distinct IPv4 addresses in it. Keep this subnet clear of the Acer LAN, VPN and existing libvirt/Docker networks, including the Docker guest bridge pool. Set the following local shell variables to approved values.
+Check all routes, existing libvirt networks and Docker IPAM ranges on the Acer before selecting a subnet and virtual MAC addresses.
+
+```bash
+ip -4 route show table all
+sudo virsh -c qemu:///system list --all
+for network in $(sudo virsh -c qemu:///system net-list --all --name); do
+  sudo virsh -c qemu:///system net-dumpxml "$network"
+done
+for network in $(sudo docker network ls --quiet); do
+  sudo docker network inspect --format '{{.Name}} {{json .IPAM.Config}}' "$network"
+done
+```
+
+Select an unused RFC 1918 /24 and three distinct IPv4 addresses in it. Keep this subnet clear of the Acer LAN, VPN and existing libvirt/Docker networks, including the Docker guest bridge pool. Set the following local shell variables to approved values.
 
 | Variable | Value |
 | --- | --- |
@@ -63,7 +76,7 @@ Check `sudo virsh -c qemu:///system net-list --all`, `sudo virsh -c qemu:///syst
 
 The NAT network enables outbound APT access and connections among the two guests and the Acer. Libvirt blocks unsolicited access from outside the guest network. Keep the router and Acer free of inbound gRPC and HTTP forwards. The consumer Compose ports bind to the reserved guest address. Existing firewall policy must allow Acer-to-guest SSH and HTTP and guest-to-guest gRPC on this network. Docker publishes through its own rules, so UFW alone is insufficient for filtering published ports. [Libvirt NAT rules](https://libvirt.org/formatnetwork.html#connectivity) · [Docker firewall behavior](https://docs.docker.com/engine/install/ubuntu/#firewall-limitations)
 
-In a Bash session on the Acer, fill in the values, then prepare a dedicated network. The MAC addresses are local virtual NIC identifiers reserved for these two domains. Check them against existing domains before proceeding. These commands fail on a previously prepared setup. Inspect partial results before retrying.
+Transfer the tracked `scripts/vm/` directory to the Acer as the SSH operator and set `VM_SCRIPTS` to its absolute path. Transfer the dedicated Mac key's `.pub` file only. Set `ACER_OPERATOR` to the existing verified Acer SSH login. In a Bash session on the Acer, fill in the values and prepare a dedicated network. The MAC addresses are local virtual NIC identifiers reserved for these two domains. Check them against existing domains before proceeding. These commands fail on a previously prepared setup. Inspect partial results before retrying.
 
 ```bash
 set -euo pipefail
@@ -90,6 +103,8 @@ PY
 umask 077
 setup_dir=$(mktemp -d)
 cd "$setup_dir"
+python3 "$VM_SCRIPTS/render-cloud-init.py" "$GUEST_USER" "$GUEST_PUBLIC_KEY_FILE" "$setup_dir"
+test "$(df -Pk /var/lib | awk 'END{print $4}')" -ge $((16 * 1024 * 1024))
 producer_mac=52:54:00:6d:64:01
 consumer_mac=52:54:00:6d:64:02
 test ! -e /var/lib/libvirt/images/mediadock
@@ -131,40 +146,75 @@ sudo mv --no-clobber "$image" "$vm_dir/noble-base.qcow2"
 sudo chown root:root "$vm_dir/noble-base.qcow2"
 sudo chmod 0444 "$vm_dir/noble-base.qcow2"
 
-for role in producer consumer; do
-  if [ "$role" = producer ]; then
-    memory=1536 disk_size=12G mac=$producer_mac
-  else
-    memory=2560 disk_size=18G mac=$consumer_mac
-  fi
+provision_guest() {
+  local role=$1 memory disk_size mac domain uuid
+  case "$role" in
+    producer) memory=1536 disk_size=12G mac=$producer_mac ;;
+    consumer) memory=2560 disk_size=18G mac=$consumer_mac ;;
+    *) return 2 ;;
+  esac
   domain="mediadock-$role"
-  {
-    printf '%s\n' '#cloud-config' "hostname: $domain" 'ssh_pwauth: false' 'disable_root: true'
-    printf '%s\n' users: "  - name: $GUEST_USER" '    shell: /bin/bash' '    lock_passwd: true'
-    printf '%s\n' '    ssh_authorized_keys:'
-    awk 'NR == 1 {printf "      - %s %s\n", $1, $2}' "$GUEST_PUBLIC_KEY_FILE"
-  } > "$domain.user-data"
-  printf 'instance-id: %s\nlocal-hostname: %s\n' "$domain" "$domain" > "$domain.meta-data"
+  test "$(awk '/^MemAvailable:/ {print $2}' /proc/meminfo)" -ge $(((memory + 1024) * 1024))
+  test "$(df -Pk /var/lib | awk 'END{print $4}')" -ge $((15 * 1024 * 1024))
 
   sudo qemu-img create -f qcow2 -F qcow2 -b "$vm_dir/noble-base.qcow2" \
     "$vm_dir/$domain.qcow2" "$disk_size"
   sudo virt-install --connect qemu:///system --virt-type kvm --cpu host-passthrough \
-    --name "$domain" --memory "$memory" --vcpus 2 --import --osinfo generic \
+    --name "$domain" --memory "$memory" --vcpus 2 --import --osinfo ubuntu24.04 \
     --disk "path=$vm_dir/$domain.qcow2,bus=virtio,format=qcow2" \
     --network "network=mediadock,model=virtio,mac=$mac" \
+    --channel unix,target.type=virtio,target.name=org.qemu.guest_agent.0 \
+    --graphics none \
     --cloud-init "user-data=$domain.user-data,meta-data=$domain.meta-data" \
     --noautoconsole
-done
-
-sudo virsh -c qemu:///system net-dhcp-leases mediadock
-sudo virsh -c qemu:///system list --all
+  uuid=$(sudo virsh -c qemu:///system domuuid "$domain")
+  test -n "$uuid"
+  printf '%s\n' "$uuid" > "$domain.uuid"
+}
+provision_guest producer
 ```
 
-The cloud-init account is for orchestration. Use the separately approved guest administration path for package setup. Confirm the two reserved addresses and verify guest SSH host-key fingerprints on first boot using the trusted libvirt console. After deployment acceptance, the owner can enable domain autostart with `sudo virsh -c qemu:///system autostart mediadock-producer` and `sudo virsh -c qemu:///system autostart mediadock-consumer` for laptop restarts.
+The first-boot script installs guest-only packages, brings up the guest agent, and enables a rootless Docker user service for the dedicated login. It delegates cgroup v2 controllers to that login so the Compose CPU and memory limits apply. It installs FFmpeg on the producer. Verify that cloud-init has completed before provisioning the consumer. Use the commands below to retrieve the producer's trusted public host key for Mac SSH enrollment, then run `cloud-init status --wait` and `test -f /var/lib/mediadock/provisioned` through the producer alias. Run `provision_guest consumer` in the same Acer shell and repeat the checks for the consumer. [Docker rootless cgroup requirements](https://docs.docker.com/engine/security/rootless/tips/#limiting-resources)
+
+```bash
+sudo virsh -c qemu:///system net-dhcp-leases mediadock
+domain=mediadock-producer  # Use mediadock-consumer on the second pass.
+sudo python3 "$VM_SCRIPTS/guest-host-key.py" "$domain" "$(cat "$domain.uuid")"
+```
+
+The host-key reader uses the guest agent on the recorded domain UUID. Use its public key to add an entry for the matching reserved IPv4 in the Mac's known-hosts file. If the address already has a different key, investigate before replacing it. Domain autostart stays disabled so the guests start only when requested.
+
+## Acer lifecycle authorization
+
+After both UUID files are available, validate the exact sudoers fragment before installing it. These commands enroll two UUIDs and permit only the eight fixed domain/operation combinations through the root-owned wrapper. The Acer SSH operator retains their existing privileged access under their normal interactive sudo policy.
+
+```bash
+[[ "$ACER_OPERATOR" =~ ^[a-z_][a-z0-9_-]{0,30}$ ]]
+getent passwd "$ACER_OPERATOR" >/dev/null
+test ! -e /usr/local/sbin/mediadock-vmctl
+test ! -e /etc/sudoers.d/mediadock-vmctl
+sudo install -d -m 0755 -o root -g root /etc/mediadock
+for domain in mediadock-producer mediadock-consumer; do
+  test ! -e "/etc/mediadock/$domain.uuid"
+  cmp <(sudo virsh -c qemu:///system domuuid "$domain") "$domain.uuid"
+  sudo install -o root -g root -m 0644 "$domain.uuid" "/etc/mediadock/$domain.uuid"
+done
+sudo install -o root -g root -m 0755 "$VM_SCRIPTS/mediadock-vmctl" /usr/local/sbin/mediadock-vmctl
+for domain in mediadock-producer mediadock-consumer; do
+  for operation in state start resume shutdown; do
+    printf '%s ALL=(root) NOPASSWD:NOSETENV: /usr/local/sbin/mediadock-vmctl %s %s\n' \
+      "$ACER_OPERATOR" "$operation" "$domain"
+  done
+done > mediadock-vmctl.sudoers
+sudo visudo -cf "$setup_dir/mediadock-vmctl.sudoers"
+sudo install -o root -g root -m 0440 mediadock-vmctl.sudoers /etc/sudoers.d/mediadock-vmctl
+sudo -n /usr/local/sbin/mediadock-vmctl state mediadock-producer
+sudo -n /usr/local/sbin/mediadock-vmctl state mediadock-consumer
+```
 
 ## Mac SSH and guest identity
 
-Add entries in `~/.ssh/config` using the owner-confirmed values. Set the names of these entries in `.env.demo`. The Acer's SSH server must permit forwarding to guest TCP 22 and the two private GUI ports. A policy change to enable that forwarding would require separate approval.
+Add entries in `~/.ssh/config` using the owner-confirmed values. Set the names of these entries in `.env.demo`. The Acer alias should have no configured forwarding. The Acer SSH server must permit forwarding to guest TCP 22 and the two guest HTTP ports. A policy change to enable that forwarding would require separate approval.
 
 ```sshconfig
 Host <acer-alias>
@@ -197,49 +247,25 @@ for guest in "$PRODUCER_SSH" "$CONSUMER_SSH"; do
 done
 ```
 
-## One-time Docker setup inside the two guests
+## Verify rootless Docker in both guests
 
-Use the signed Docker APT repository in each Ubuntu 24.04 amd64 guest. The Acer already has its host Docker installation. Review any pre-existing Docker/containerd packages first. Resolve package conflicts through separate approval before continuing. The Docker group is root-equivalent. These one-time commands are for the provisioning operator. Any operator group grant requires explicit approval. Provide the normal MediaDock commands with scoped access to owned services and fixed domain identities, keeping admin group access separate from the lifecycle identity. [Docker installation and supported Ubuntu releases](https://docs.docker.com/engine/install/ubuntu/) · [Docker group privileges](https://docs.docker.com/engine/install/linux-postinstall/#manage-docker-as-a-non-root-user)
-
-```bash
-sudo apt-get update
-sudo apt-get install ca-certificates curl
-sudo install -m 0755 -d /etc/apt/keyrings
-sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
-sudo chmod a+r /etc/apt/keyrings/docker.asc
-
-. /etc/os-release
-case "$VERSION_CODENAME" in
-  noble) ;;
-  *) printf 'Unexpected Ubuntu suite\n' >&2; exit 1 ;;
-esac
-test "$(dpkg --print-architecture)" = amd64 || exit 1
-sudo tee /etc/apt/sources.list.d/docker.sources >/dev/null <<SOURCES
-Types: deb
-URIs: https://download.docker.com/linux/ubuntu
-Suites: $VERSION_CODENAME
-Components: stable
-Architectures: amd64
-Signed-By: /etc/apt/keyrings/docker.asc
-SOURCES
-
-sudo apt-get update
-sudo apt-get install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
-sudo systemctl enable --now docker
-```
-
-The one-time operator can use `sudo docker` or an already approved Docker group identity for the remaining build and deployment commands. The lifecycle authorization is reviewed separately.
-
-On the **producer guest only**, install `ffmpeg` for native synthetic fixture generation. Both guest releases should retain at least 2 GiB free before loading new images or starting scenarios. Check `df -h /var/lib`, `docker system df`, `docker compose version`, and `docker info --format '{{.Name}} {{.ID}}'` in each guest after reconnecting.
+From the Mac, run the following after using the trusted host keys to enroll both guest addresses. Compare machine and Docker daemon IDs across the guests. Record each machine ID for `.env.demo`. Each guest should retain at least 2 GiB of free disk before loading images or running scenarios.
 
 ```bash
-sudo apt-get install ffmpeg
-install -d -m 0755 "$HOME/mediadock/samples"
+for guest in "$PRODUCER_SSH" "$CONSUMER_SSH"; do
+  ssh -T -o BatchMode=yes -o StrictHostKeyChecking=yes "$guest" \
+    'cloud-init status --wait && test -f /var/lib/mediadock/provisioned &&
+     cat /etc/machine-id && docker context inspect --format "{{.Endpoints.docker.Host}}" &&
+     docker info --format "{{.Name}} {{.ID}} {{.CgroupDriver}} {{.CgroupVersion}} {{json .SecurityOptions}}" &&
+     docker compose version && df -h /var/lib && docker system df'
+done
 ```
+
+The Docker endpoint must be `unix:///run/user/<guest-uid>/docker.sock`. The cgroup driver and version must be `systemd 2`, and security options must include `name=rootless`. The one-time host authorization covers the fixed `mediadock-vmctl` commands.
 
 ## Stage and build one revision on the Acer
 
-From the Mac checkout, choose the committed revision that contains P1 build fixes, the compatible consumer HTTP implementation and P3. Export its full Git SHA as `IMAGE_REVISION`. Keep this tag and the resulting image IDs paired for deployment. Archive the tracked build inputs and prepare lightweight release directories on the guests. The Mac relays these streams and later image transfers through SSH.
+From the Mac checkout, enter `cpp_media_upload/` and select the reviewed integration commit to build and deploy. Export its full Git SHA as `IMAGE_REVISION`. Keep this tag and the resulting image IDs paired for deployment. Archive the tracked build inputs and prepare lightweight release directories on the guests. The Mac relays these streams and later image transfers through SSH.
 
 ```bash
 set -euo pipefail
@@ -251,56 +277,45 @@ git archive "$IMAGE_REVISION" .dockerignore CMakeLists.txt docker infra proto sr
     "mkdir -p '$release_dir' && tar -xf - -C '$release_dir'"
 
 for guest in "$PRODUCER_SSH" "$CONSUMER_SSH"; do
-  git archive "$IMAGE_REVISION" infra tests/e2e |
+  git archive "$IMAGE_REVISION" infra scripts/demo tests/e2e |
     ssh -T -o BatchMode=yes "$guest" "mkdir -p '$release_dir' && tar -xf - -C '$release_dir'"
 done
 ```
 
-After uploads have drained, shut down both guests for the build session with `virsh -c qemu:///system shutdown mediadock-producer` and `virsh -c qemu:///system shutdown mediadock-consumer`. Confirm both domains are off with `virsh -c qemu:///system list --all`. Check `free -h`, `df -h /var/lib`, `vmstat 2 5` and `docker system df` on the Acer. Start with about 12 GiB free on the host and monitor for a drop below 1 GiB available memory or sustained swap-in or swap-out. Pause between operations if the thresholds are reached and reassess before more growth. Build with a single Ninja job and run the Compose targets one at a time so they reuse the same cached builder stage. The builder uses Ubuntu's packaged Noble dependencies, runs all CTest tests with FFmpeg available and treats skipped tests as a build failure. APT patch releases can advance between builds. The date-stamped Ubuntu base is listed in the Docker Official Image catalog. [Ubuntu base image tags](https://hub.docker.com/_/ubuntu/tags?name=noble) · [Noble Drogon package](https://packages.ubuntu.com/noble/libdrogon-dev)
+Use `./demo.sh stop` before a new image build when the demo is already deployed. On first setup, gracefully shut down both idle guests through the enrolled wrapper. Confirm both domains are off using the wrapper’s `state` command. Check `free -h`, `df -h /var/lib`, `vmstat 2 5` and `sudo docker system df` on the Acer. Maintain at least 15 GiB free on the host and monitor for a drop below 1 GiB available memory or sustained swap-in or swap-out. Pause between operations if the thresholds are reached and reassess before more growth. Build with a single Ninja job and run the Compose targets one at a time so they reuse the same cached builder stage. The builder uses Ubuntu's packaged Noble dependencies, runs all CTest tests with FFmpeg available and treats skipped tests as a build failure. APT patch releases can advance between builds. The date-stamped Ubuntu base is listed in the Docker Official Image catalog. [Ubuntu base image tags](https://hub.docker.com/_/ubuntu/tags?name=noble) · [Noble Drogon package](https://packages.ubuntu.com/noble/libdrogon-dev)
 
-Run in the staged release directory **on the Acer**. Set `IMAGE_REVISION` in that shell to the release directory's 40-character SHA before running these commands. `imagetools inspect` verifies registry metadata without pulling layers.
+Build the new revision only after approval for that revision. Use the monitored image-gate runner in [the Ubuntu build gate](UBUNTU_BUILD_GATE.md) with both VMs stopped. Keep the producer and consumer image IDs printed by the runner paired with the source SHA. Reuse validated tags without replacing them.
+
+Start the two guests via `sudo -n /usr/local/sbin/mediadock-vmctl start mediadock-producer` and `sudo -n /usr/local/sbin/mediadock-vmctl start mediadock-consumer` after the heavy build is complete. For each role, run the following on the Acer in an interactive SSH session with sudo access. The gzip export is written to an owner-only path on the Acer. Keep at least 15 GiB free before and during the export. The procedure exports one image at a time and requires no Mac-side storage for images.
 
 ```bash
-set -euo pipefail
-: "${IMAGE_REVISION:?set the staged Git commit SHA}"
 [[ "$IMAGE_REVISION" =~ ^[a-f0-9]{40}$ ]]
-export IMAGE_REVISION
-cd "$HOME/mediadock/releases/$IMAGE_REVISION"
-test "$(uname -m)" = x86_64
-test "$(docker info --format '{{.Architecture}}')" = x86_64
-
-docker buildx imagetools inspect ubuntu:noble-20261110.1
-docker compose -f infra/build.compose.yml config --quiet
-for role in producer consumer; do
-  image="mediadock/$role:$IMAGE_REVISION"
-  if ! docker image inspect "$image" >/dev/null 2>&1; then
-    docker compose --progress plain --parallel 1 -f infra/build.compose.yml build "$role"
-  fi
-  test "$(docker image inspect --format '{{.Os}}/{{.Architecture}} {{index .Config.Labels "org.opencontainers.image.revision"}}' "$image")" = \
-    "linux/amd64 $IMAGE_REVISION"
-  docker image inspect --format '{{.Id}} {{join .RepoTags ", "}}' "$image"
-done
-docker system df
+case "$role" in producer|consumer) ;; *) exit 2 ;; esac
+set -euo pipefail
+test "$(df -Pk "$HOME" | awk 'END{print $4}')" -ge $((16 * 1024 * 1024))
+umask 077
+release_dir="$HOME/mediadock/releases/$IMAGE_REVISION"
+image="mediadock/$role:$IMAGE_REVISION"
+archive=$(mktemp "$release_dir/$role.image.XXXXXX")
+sudo docker image inspect --format '{{.Id}} {{index .Config.Labels "org.opencontainers.image.revision"}}' "$image"
+sudo docker image save "$image" | gzip -1 > "$archive"
+gzip -t "$archive"
+printf '%s\n' "$archive"
 ```
 
-Start the existing guests from the Acer with `virsh -c qemu:///system start mediadock-producer` and `virsh -c qemu:///system start mediadock-consumer`. Stream each compressed image once from the Acer to the corresponding daemon with the following commands from the Mac. The streams carry the saved image through the Mac's SSH processes and use no archive files.
+From the Mac, set `archive` to the exact path printed for the current role. Set `guest` to its verified guest SSH alias. Relay the archive through both SSH connections as a stream and inspect the loaded tag on the guest. Compare its ID and revision to the original before staging the next role. Retain or remove only the temporary export created in this step after confirming the guest load, according to the available disk budget.
 
 ```bash
 set -euo pipefail
-for role in producer consumer; do
-  if [ "$role" = producer ]; then guest=$PRODUCER_SSH; else guest=$CONSUMER_SSH; fi
-  image="mediadock/$role:$IMAGE_REVISION"
-  staged_id=$(ssh -T -o BatchMode=yes "$UBUNTU_LAPTOP_SSH" "docker image inspect --format '{{.Id}}' '$image'")
-  guest_id=$(ssh -T -o BatchMode=yes "$guest" "docker image inspect --format '{{.Id}}' '$image' 2>/dev/null || true")
-  if [ -z "$guest_id" ]; then
-    ssh -T -o BatchMode=yes "$UBUNTU_LAPTOP_SSH" "bash -o pipefail -c 'docker image save $image | gzip -1'" |
-      ssh -T -o BatchMode=yes "$guest" docker image load
-  fi
-  test "$(ssh -T -o BatchMode=yes "$guest" "docker image inspect --format '{{.Id}}' '$image'")" = "$staged_id"
-done
+image="mediadock/$role:$IMAGE_REVISION"
+ssh -T -o BatchMode=yes -o StrictHostKeyChecking=yes "$UBUNTU_LAPTOP_SSH" "cat -- '$archive'" |
+  ssh -T -o BatchMode=yes -o StrictHostKeyChecking=yes "$guest" docker image load
+format='{{.Id}} {{index .Config.Labels "org.opencontainers.image.revision"}}'
+ssh -T -o BatchMode=yes -o StrictHostKeyChecking=yes "$guest" \
+  "docker image inspect --format '$format' '$image'"
 ```
 
-The runtime Compose files use these preloaded tags. Keep a record of the revision and both image IDs. Reuse a validated image under its original tag. A rebuild with new source or dependency inputs requires a new committed revision.
+The runtime Compose files use the preloaded tags with pulls disabled. Keep both image IDs with the release evidence. A rebuild against new inputs uses a new committed source revision.
 
 ## Smoke tests and runtime commands
 

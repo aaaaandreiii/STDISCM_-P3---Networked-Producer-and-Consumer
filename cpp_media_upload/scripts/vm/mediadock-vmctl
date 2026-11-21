@@ -1,0 +1,32 @@
+#!/bin/bash
+set -euo pipefail
+export LC_ALL=C
+
+if [[ $# -ne 2 ]]; then
+  printf '%s\n' 'Usage: mediadock-vmctl {state|start|resume|shutdown} {mediadock-producer|mediadock-consumer}' >&2
+  exit 2
+fi
+operation=$1
+domain=$2
+case "$domain" in mediadock-producer|mediadock-consumer) ;; *) exit 2 ;; esac
+case "$operation" in state|start|resume|shutdown) ;; *) exit 2 ;; esac
+virsh=(/usr/bin/virsh --quiet --connect qemu:///system)
+read -r uuid < "/etc/mediadock/${domain}.uuid"
+if [[ ! $uuid =~ ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$ ]] ||
+   [[ $("${virsh[@]}" domuuid "$domain") != "$uuid" ]]; then
+  printf 'Cannot verify the enrolled MediaDock domain %s.\n' "$domain" >&2
+  exit 1
+fi
+
+state=$("${virsh[@]}" domstate "$uuid")
+case "$operation:$state" in
+  state:*) printf '%s\n' "$state" ;;
+  'start:shut off'|'resume:paused'|'shutdown:running')
+    "${virsh[@]}" "$operation" "$uuid"
+    ;;
+  'start:running'|'resume:running'|'shutdown:shut off'|'shutdown:in shutdown') ;;
+  *)
+    printf 'Cannot %s %s while its state is %s.\n' "$operation" "$domain" "$state" >&2
+    exit 1
+    ;;
+esac
