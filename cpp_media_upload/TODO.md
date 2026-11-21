@@ -9,7 +9,8 @@
 - [x] P0 development gate: record owner-verified Acer inventory and approve two resource-limited Ubuntu Server 24.04 guests.
 - [x] Owner approved the exact [Acer native toolchain commands](docs/UBUNTU_BUILD_GATE.md#approval-1--install-the-native-toolchain-on-the-acer).
 - [x] Verify the dedicated Codex SSH identity with BatchMode.
-- [ ] Complete the native toolchain install through interactive sudo; continue the native gate via BatchMode SSH. Obtain separate approvals for any required [Docker install](docs/UBUNTU_BUILD_GATE.md#approval-2--install-docker-on-the-acer) and [KVM/libvirt provisioning](docs/VM_SETUP.md).
+- [x] Owner completed the native toolchain install. Acer Debug and Release builds and CTest passed over BatchMode SSH.
+- [ ] Obtain separate approvals for [existing Docker daemon use](docs/UBUNTU_BUILD_GATE.md#approval-2--build-with-the-acers-existing-docker) and [KVM/libvirt provisioning](docs/VM_SETUP.md).
 - [ ] Before deployment: verify KVM API and device permissions, configured apt candidates and safe resource limits. Use [a separate amd64 builder or KVM host](docs/10_MAC_UBUNTU_HOST_TOPOLOGY.md#fallback-if-the-acer-reaches-its-limits) if needed.
 - [x] Confirmed two separate Ubuntu VMs with Docker containers inside each are acceptable. Single-host Docker mode is test-only.
 - [ ] P0: verify ports 50051/8080/50052/8081, test media acceptance; confirm exact privileged host/VM installation steps before executing them (plan approved, unattended sudo not automatically approved).
@@ -21,7 +22,7 @@
 ## Codex implementation phases
 
 - [x] **P0 development gate** Source, worktrees, reviewed inventory and contracts recorded. Wave 1 released. Remaining host and deployment checks are tracked above. See [P0 baseline report](docs/P0_BASELINE_REPORT.md).
-- [ ] **P1** Always-on tests and CMake fixes merged. Full Ubuntu build and CTest gate pending.
+- [x] **P1** Always-on tests and CMake fixes merged. Full Acer Ubuntu Debug and Release builds and CTest verified for `917a621`.
 - [ ] **P2** gRPC concurrency/producer/consumer correctness and real integration tests — Agent A.
 - [ ] **P3** Docker/Compose and VM setup merged. Ubuntu image build and guest rollout gates pending.
 - [ ] **P4** Drogon HTTP, gallery preview/playback/browser+Range verification — Agent B.
@@ -31,7 +32,7 @@
 
 ## Hard acceptance checks
 
-- [ ] `cmake` full app builds and `ctest` tests pass in Debug + Release (with real assertions active).
+- [x] Full native Acer Ubuntu app builds and CTest passed in Debug and Release at `917a621`. Rerun affected checks at the final integration gate.
 - [ ] Build container images with pinned/recorded Ubuntu base and dependency versions (no hidden manual installs at demo time).
 - [ ] Producer logs prove `p` separate folders/threads; consumer logs prove `c` worker threads.
 - [ ] `q` caps waiting descriptors; `QUEUE_FULL` appears deterministically in real producer output without corrupting accepted uploads.
@@ -58,7 +59,7 @@
 
 ## Hold points
 
-1. Complete approved native Debug/Release CMake and CTest, then separately approved Docker builds before Wave 2. Show exact independently approved VM setup operations before provisioning.
+1. Complete approved native Debug/Release CMake and CTest, then separately approved Docker builds with the existing Acer daemon before Wave 2. Show exact independently approved VM setup operations before provisioning.
 2. After P1+P3, do not merge incompatible Docker/CMake assumptions without a compile test.
 3. After P2+P4, recheck API URLs and HTTP/Protobuf contracts.
 4. After P5+P6, run a **fresh** two-VM demo and a **rerun** preserving data before P7 sign-off.

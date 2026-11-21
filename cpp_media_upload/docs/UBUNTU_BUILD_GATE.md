@@ -1,10 +1,10 @@
 # Acer Ubuntu build gate
 
-Run the native gate on the Acer's Ubuntu 26.04 amd64 installation. Run the Noble container image builds on that same laptop after the native gate passes. The owner approved the exact native toolchain commands in Approval 1. Docker installation is pending a separate approval. Workspace setup, builds, and checks use one job at a time. VM provisioning has its own approval and follows the native gate.
+Run the native gate on the Acer's Ubuntu 26.04 amd64 installation. Run the Noble container image builds on that same laptop after the native gate passes. The owner approved the exact native toolchain commands in Approval 1. The native gate passed. Approval 2 covers reuse of the Acer’s existing Docker installation for MediaDock image checks. Workspace setup, builds, and checks use one job at a time. VM provisioning has its own approval and follows the native gate.
 
 ## Verify the SSH login
 
-The owner confirmed an interactive login from the Mac. The dedicated identity subsequently also passed strict-host-key BatchMode authentication through Codex. The Acer requires interactive sudo authentication for package work. The operator can run the exact approved native install in their authenticated terminal, then Codex can continue the unprivileged builds and tests. The release-specific installer records its apt output and exit code for evidence.
+The owner confirmed an interactive login from the Mac. The dedicated identity subsequently also passed strict-host-key BatchMode authentication through Codex. The Acer requires interactive sudo authentication for privileged operations. The operator ran the exact approved native install. The recorded exit code was 0, and Codex completed the unprivileged builds and tests. The release-specific installer records its apt output and exit code for evidence.
 
 From the Mac, use the verified Acer login destination. With the same known host key already recorded under the previous address, `HostKeyAlias` can preserve strict host-key verification. Once the dedicated public key is authorized on the Acer, run one bounded BatchMode check using the Mac identity. Check the authenticated username, hostname, release and architecture before using the Acer commands.
 
@@ -111,9 +111,13 @@ done
 printf 'Native evidence: %s\n' "$evidence"
 ```
 
-## Approval 2 — install Docker on the Acer
+## Approval 2 — build with the Acer’s existing Docker
 
-This is the Acer-only portion of the existing signed Docker APT setup. Start this after the native gate passes. The commands add Docker's APT key and source, install Engine, Buildx and Compose, and start the daemon. Docker's standard bridge initialization can enable IP forwarding and add packet-filtering rules. The build gate uses `sudo docker` and publishes no ports. Existing Docker/containerd packages, APT sources or key paths require review before continuing. [Docker installation](https://docs.docker.com/engine/install/ubuntu/) · [Docker bridge packet filtering](https://docs.docker.com/engine/network/packet-filtering-firewalls/)
+The Acer already reports Docker 29.10.0, Buildx 0.39.1 and Compose 5.8.0. Docker and containerd are active, and the build account lacks direct Docker socket access. Request explicit approval for the exact privileged commands in [the build and image checks below](#build-both-runtime-images-sequentially-on-the-acer), using the same staged source revision. The gate reuses the running daemon and does not need host package, repository, Docker group or daemon configuration changes. The build pulls and caches image layers and writes MediaDock-tagged images. The executable checks use transient containers with networking disabled, no published ports, and no mounted volumes.
+
+### Fresh installation contingency
+
+This is the Acer-only portion of the existing signed Docker APT setup for a host without Docker. It is retained for a future separately approved installation. The current Acer does not need it. The commands add Docker's APT key and source, install Engine, Buildx and Compose, and start the daemon. Docker's standard bridge initialization can enable IP forwarding and add packet-filtering rules. The build gate uses `sudo docker` and publishes no ports. Existing Docker/containerd packages, APT sources or key paths require review before continuing. [Docker installation](https://docs.docker.com/engine/install/ubuntu/) · [Docker bridge packet filtering](https://docs.docker.com/engine/network/packet-filtering-firewalls/)
 
 ```bash
 set -euo pipefail
@@ -165,6 +169,10 @@ set -euo pipefail
 cd "$HOME/mediadock/releases/$IMAGE_REVISION"
 test "$(cat .source-revision)" = "$IMAGE_REVISION"
 evidence=$(mktemp -d "$PWD/build-image-evidence.XXXXXX")
+sudo docker version
+sudo docker buildx version
+sudo docker compose version
+sudo docker buildx imagetools inspect ubuntu:noble-20261110.1
 docker_root=$(sudo docker info --format '{{.DockerRootDir}}')
 docker_mount=$(sudo df --output=target "$docker_root" | sed -n '2p')
 containerd_mount=$(sudo df --output=target /var/lib/containerd | sed -n '2p')
@@ -193,6 +201,7 @@ for role in producer consumer; do
     --format '{{.Os}}/{{.Architecture}} {{index .Config.Labels "org.opencontainers.image.revision"}}' "$image")
   test "$identity" = "linux/amd64 $IMAGE_REVISION"
   sudo docker image inspect --format '{{.Id}} {{.Size}}' "$image"
+  sudo docker run --rm --network none "$image" --help 2>&1 | tee "$evidence/$role-help.log"
 done
 sudo docker system df
 printf 'Docker evidence: %s\n' "$evidence"

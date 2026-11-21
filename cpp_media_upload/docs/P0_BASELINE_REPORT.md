@@ -129,3 +129,27 @@ The owner subsequently approved Approval 1 and remote access. A sandbox-exempt c
 The updated private address passed strict-host-key BatchMode authentication with the dedicated key. The read-only preflight exited 0 on Ubuntu 26.04.1 LTS amd64. The Acer reported six logical CPUs, 6.6 GiB total RAM, 5.3 GiB available, 4 GiB swap with 0 B used, and 50 GiB available on the Ubuntu filesystem. One-second `vmstat` samples showed zero swap-in and swap-out. Docker, containerd, and a containerized database were already running. The read-only version commands reported Docker 29.10.0, Buildx 0.39.1 and Compose 5.8.0. Headroom was adequate to leave the other project running.
 
 A read-only `apt-get --simulate install --no-install-recommends --no-remove …` using the approved package list reported 218 new packages, seven dependency upgrades and zero removals from the current apt indexes. The refreshed simulation is part of the approved install script. `sudo -n -l /usr/bin/apt-get update` returned `interactive authentication is required`. Codex staged the tracked source at revision `917a6218d499632fe3a3c6a836ab7ffaed9349cd` in the owner’s release directory and matched the remote install script SHA-256 to the approved runbook. The terminal runner passes through the user's own sudo prompt and records `native-install.log` and `native-install.exit`. Native package installation, Debug and Release builds, and CTest are pending the authenticated operator step. No Docker or VM mutations occurred.
+
+### Acer native build gate — PASS
+
+The user-run native installation recorded exit 0, and `dpkg --audit` returned exit 0 with no output. The full native build at staged revision `917a6218d499632fe3a3c6a836ab7ffaed9349cd` ran on Ubuntu 26.04.1 LTS amd64. Toolchain versions were GCC/G++ 15.2.0, CMake 4.2.3, Ninja 1.13.2, gRPC 1.51.1-8ubuntu1, Protobuf 3.21.12-15ubuntu1.1, Drogon 1.9.11+ds-1, Trantor 1.5.24+ds-1, OpenSSL 3.5.5, SQLite 3.46.1 and FFmpeg 8.0.1-3ubuntu2.
+
+From the staged release directory, the [native command block](UBUNTU_BUILD_GATE.md#run-native-cmake-and-ctest-on-the-acer) used the following core commands for each configuration, in separate clean directories and one job at a time.
+
+```bash
+cmake -S . -B "$build" -G Ninja -DBUILD_FULL_APP=ON -DBUILD_TESTING=ON -DCMAKE_BUILD_TYPE="$config"
+cmake --build "$build" --parallel 1
+ctest --test-dir "$build" --output-on-failure --no-tests=error --parallel 1 \
+  --output-junit "$evidence/$config-ctest.xml"
+```
+
+| Configuration | Configure | Build | CTest | Binaries |
+|---|---|---|---|---|
+| Debug | Exit 0 | Exit 0, 20 steps | Exit 0, 2/2 passed in 0.82 s | Producer and consumer `--help` exit 0 |
+| Release | Exit 0 | Exit 0, 20 steps | Exit 0, 2/2 passed in 0.75 s | Producer and consumer `--help` exit 0 |
+
+Both suites ran `media_core_tests` and `media_pipeline_smoke` with zero failures or skips. The build logs contained no compiler warnings or errors. Acer evidence is in `mediadock/releases/917a6218d499632fe3a3c6a836ab7ffaed9349cd/build-gate-evidence.UdztG4`; local text copies are under `.demo-evidence/acer-native-917a621/`.
+
+The six-core Acer had 5.3 GiB `MemAvailable` before and after the gate. The lowest observed sample was 4.9 GiB. Swap usage and swap-in/out stayed at zero. Free disk remained approximately 49 GiB; both build trees and logs occupied about 51 MiB. Docker and containerd were active before and after, and the same containerized database PID remained running. The build account could not query the Docker socket, so application-level health of the other project was not independently tested.
+
+Approval 2 now concerns [using the existing Docker daemon](UBUNTU_BUILD_GATE.md#approval-2--build-with-the-acers-existing-docker) for the serial Noble image gate. No Docker installation, image build or VM provisioning was performed. Wave 2 remains held at the image gate.
