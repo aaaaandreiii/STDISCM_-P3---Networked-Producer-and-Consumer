@@ -26,18 +26,27 @@ if(BUILD_FULL_APP)
   find_package(Protobuf REQUIRED)
   find_package(gRPC CONFIG REQUIRED)
   find_package(Drogon CONFIG REQUIRED)
+  if(NOT TARGET protobuf::protoc)
+    message(FATAL_ERROR "BUILD_FULL_APP requires protoc (protobuf-compiler on Ubuntu)")
+  endif()
+  if(TARGET gRPC::grpc_cpp_plugin)
+    set(GRPC_CPP_PLUGIN "$<TARGET_FILE:gRPC::grpc_cpp_plugin>")
+  else()
+    find_program(GRPC_CPP_PLUGIN NAMES grpc_cpp_plugin REQUIRED)
+  endif()
   set(PROTO_DIR "${CMAKE_CURRENT_SOURCE_DIR}/proto")
   set(GEN_DIR "${CMAKE_CURRENT_BINARY_DIR}/generated")
   file(MAKE_DIRECTORY "${GEN_DIR}")
   add_library(media_proto STATIC "${PROTO_DIR}/media.proto")
   target_include_directories(media_proto PUBLIC "${GEN_DIR}")
   target_link_libraries(media_proto PUBLIC protobuf::libprotobuf gRPC::grpc++)
-  protobuf_generate(TARGET media_proto IMPORT_DIRS "${PROTO_DIR}" PROTOC_OUT_DIR "${GEN_DIR}")
+  # Keep generated headers directly under GEN_DIR, as the C++ sources expect.
+  protobuf_generate(TARGET media_proto APPEND_PATH PROTOC_OUT_DIR "${GEN_DIR}")
   protobuf_generate(
-    TARGET media_proto LANGUAGE grpc
+    TARGET media_proto LANGUAGE grpc APPEND_PATH
     GENERATE_EXTENSIONS .grpc.pb.h .grpc.pb.cc
-    PLUGIN "protoc-gen-grpc=$<TARGET_FILE:gRPC::grpc_cpp_plugin>"
-    IMPORT_DIRS "${PROTO_DIR}" PROTOC_OUT_DIR "${GEN_DIR}")
+    PLUGIN "protoc-gen-grpc=${GRPC_CPP_PLUGIN}"
+    PROTOC_OUT_DIR "${GEN_DIR}")
 
   add_executable(media_producer src/producer/main.cpp)
   target_link_libraries(media_producer PRIVATE media_core media_proto)
@@ -56,4 +65,5 @@ if(BUILD_TESTING)
   add_executable(media_pipeline_smoke tests/pipeline_smoke.cpp)
   target_link_libraries(media_pipeline_smoke PRIVATE media_runtime)
   add_test(NAME media_pipeline_smoke COMMAND media_pipeline_smoke)
+  set_tests_properties(media_pipeline_smoke PROPERTIES SKIP_RETURN_CODE 77)
 endif()
