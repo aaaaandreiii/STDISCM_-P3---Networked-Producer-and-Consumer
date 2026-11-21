@@ -161,15 +161,17 @@ sudo docker compose version
 
 ## Build both runtime images sequentially on the Acer
 
-The verified runner is staged at `.approval2/run-image-gate.sh` in the Acer release directory for `917a6218d499632fe3a3c6a836ab7ffaed9349cd`. Run this from the Mac with the Acer SSH destination configured. The operator authenticates to sudo in the terminal.
+The corrected runner is staged at `.approval2-r2/run-image-gate.sh` in the Acer release directory for `917a6218d499632fe3a3c6a836ab7ffaed9349cd`. Run this from the Mac with the Acer SSH destination configured. The operator authenticates to sudo in the terminal.
 
 ```bash
 : "${UBUNTU_LAPTOP_SSH:?set the verified Acer SSH destination}"
 ssh -tt -i "$HOME/.ssh/id_ed25519_mediadock" \
   -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes "$UBUNTU_LAPTOP_SSH" \
-  'bash "$HOME/mediadock/releases/917a6218d499632fe3a3c6a836ab7ffaed9349cd/.approval2/run-image-gate.sh"'
+  'bash "$HOME/mediadock/releases/917a6218d499632fe3a3c6a836ab7ffaed9349cd/.approval2-r2/run-image-gate.sh"'
 ```
 
-The runner checks the staged source checksums, authenticated tool versions and local builder. It records running container IDs and their state, start time, restart count and health field when present. It also records memory, swap, disk and Docker storage before and after the builds. The minimum free space is 15 GiB. An 18 GiB cutoff leaves a buffer for writes in progress. During each serial build it samples available RAM, swap-in and swap-out, memory pressure and disk, and compares baseline container state. The gate cancels its own Compose build on sustained swapping, severe memory pressure, loss of disk headroom or a change in a baseline container. It also compares container state after the gate. Docker health metadata alone is insufficient for an application-level health claim.
+The runner checks the staged source checksums, authenticated tool versions and local builder. It records running container IDs, state, start time and restart count. It inspects Docker JSON read-only and treats health as optional, distinguishing healthy, unhealthy, starting, no configured health check, and a configured check whose result is unavailable. Exited, created and dead containers are classified as stopped. Only the comparison fields are logged. It also records memory, swap, disk and Docker storage before and after the builds. The minimum free space is 15 GiB. An 18 GiB cutoff leaves a buffer for writes in progress. During each serial build it samples available RAM, swap-in and swap-out, memory pressure and disk, and compares baseline container state. The gate cancels its own Compose build on sustained swapping, severe memory pressure, loss of disk headroom or a change in a baseline container. It also compares container state after the gate. Docker health metadata alone is insufficient for an application-level health claim.
+
+The original runner and failed evidence directory `build-image-evidence.MAPAGV/` are retained. That first attempt failed while inspecting an optional health field before either image build started. The regression test is `bash tests/e2e/docker-container-snapshot.sh`.
 
 The evidence directory `build-image-evidence.<suffix>/` contains exact logged build commands and exits, image metadata, per-image help output, before/after container snapshots, resource samples and `gate.exit`. Review the actual evidence before releasing Wave 2. Actual guest provisioning remains behind [Approval 3](VM_SETUP.md).
