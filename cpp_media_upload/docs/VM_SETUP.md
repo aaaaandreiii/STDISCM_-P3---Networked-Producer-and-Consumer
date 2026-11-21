@@ -7,7 +7,7 @@
 | `mediadock-producer`, Ubuntu Server 24.04 amd64 | Guest Docker Engine, one-shot producer and fixture generation | 2 vCPU, 1536 MiB RAM, sparse 12 GiB QCOW2 |
 | `mediadock-consumer`, Ubuntu Server 24.04 amd64 | Independent guest Docker Engine, gallery and gRPC | 2 vCPU, 2560 MiB RAM, sparse 18 GiB QCOW2 |
 
-The owner verified direct TCP connectivity and an interactive Mac-to-Acer SSH login. Codex reached SSH with network permission and is awaiting noninteractive authentication. Start with the [Acer native and Docker build gate](UBUNTU_BUILD_GATE.md). VM provisioning, full-image builds, container health and the cross-VM rollout remain pending.
+The owner verified direct TCP connectivity and an interactive Mac-to-Acer SSH login. Codex reached SSH with network permission. The dedicated Mac identity is pending. Start with the [Acer native and Docker build gate](UBUNTU_BUILD_GATE.md). VM provisioning, full-image builds, container health and the cross-VM rollout remain pending.
 
 ## Before approval
 
@@ -28,7 +28,7 @@ for tool in virsh docker; do command -v "$tool" || true; done
 AUDIT
 ```
 
-Review the commands below before the first setup. Approval covers the listed APT package and repository changes, Docker/libvirt group grants, the dedicated libvirt NAT network and its firewall rules, the base image and two guest disks, guest creation, owner public-key authorization in cloud-init, and Mac SSH host aliases and host-key trust. The host directory `/var/lib/libvirt/images/mediadock` and Docker's data directories must be on the Ubuntu filesystem. Leave partition tables, Windows volumes and data, existing host SSH policy and unrelated networks alone. Local app image builds and VM starts begin after the one-time privileged setup.
+Review the commands below before the first setup. These are one-time operator operations. Before provisioning, verify a separate approved administrative access path for each guest and review the narrowly scoped lifecycle permissions in the [demo specification](07_ONE_COMMAND_DEMO_SPEC.md). Approval covers the listed APT package and repository changes, any optional operator Docker/libvirt group grants, the dedicated libvirt NAT network and its firewall rules, the base image and two guest disks, guest creation, owner public-key authorization in cloud-init, and Mac SSH host aliases and host-key trust. The host directory `/var/lib/libvirt/images/mediadock` and Docker's data directories must be on the Ubuntu filesystem. Leave partition tables, Windows volumes and data, existing host SSH policy and unrelated networks alone. Local app image builds and VM starts begin after the one-time privileged setup.
 
 ## One-time Acer virtualization setup
 
@@ -48,7 +48,7 @@ Check `virsh -c qemu:///system net-list --all`, `virsh -c qemu:///system list --
 | --- | --- |
 | `BRIDGE_IP` | Libvirt bridge and guest default gateway |
 | `PRODUCER_IP`, `CONSUMER_IP` | Producer and consumer DHCP reservations |
-| `GUEST_USER` | Owner-selected lowercase Linux username for both guest VMs |
+| `GUEST_USER` | Owner-selected lowercase SSH username for MediaDock orchestration on both guests |
 | `GUEST_PUBLIC_KEY_FILE` | Acer path to the owner's SSH **public** key file |
 
 The NAT network enables outbound APT access and connections among the two guests and the Acer. Libvirt blocks unsolicited access from outside the guest network. Keep the router and Acer free of inbound gRPC and HTTP forwards. The consumer Compose ports bind to the reserved guest address. Existing firewall policy must allow Acer-to-guest SSH and HTTP and guest-to-guest gRPC on this network. Docker publishes through its own rules, so UFW alone is insufficient for filtering published ports. [Libvirt NAT rules](https://libvirt.org/formatnetwork.html#connectivity) · [Docker firewall behavior](https://docs.docker.com/engine/install/ubuntu/#firewall-limitations)
@@ -131,7 +131,7 @@ for role in producer consumer; do
   {
     printf '%s\n' '#cloud-config' "hostname: $domain" 'ssh_pwauth: false' 'disable_root: true'
     printf '%s\n' users: "  - name: $GUEST_USER" '    shell: /bin/bash' '    lock_passwd: true'
-    printf '%s\n' '    sudo: ["ALL=(ALL) NOPASSWD:ALL"]' '    ssh_authorized_keys:'
+    printf '%s\n' '    ssh_authorized_keys:'
     awk 'NR == 1 {printf "      - %s %s\n", $1, $2}' "$GUEST_PUBLIC_KEY_FILE"
   } > "$domain.user-data"
   printf 'instance-id: %s\nlocal-hostname: %s\n' "$domain" "$domain" > "$domain.meta-data"
@@ -150,7 +150,7 @@ virsh -c qemu:///system net-dhcp-leases mediadock
 virsh -c qemu:///system list --all
 ```
 
-Cloud-init grants the selected guest SSH account passwordless administrator access. Confirm the two reserved addresses and verify guest SSH host-key fingerprints on first boot using the trusted libvirt console. After deployment acceptance, the owner can enable domain autostart with `virsh -c qemu:///system autostart mediadock-producer` and `virsh -c qemu:///system autostart mediadock-consumer` for laptop restarts.
+The cloud-init account is for orchestration. Use the separately approved guest administration path for package setup. Confirm the two reserved addresses and verify guest SSH host-key fingerprints on first boot using the trusted libvirt console. After deployment acceptance, the owner can enable domain autostart with `virsh -c qemu:///system autostart mediadock-producer` and `virsh -c qemu:///system autostart mediadock-consumer` for laptop restarts.
 
 ## Mac SSH and guest identity
 
@@ -189,7 +189,7 @@ done
 
 ## One-time Docker setup on the Acer and both guests
 
-Use the signed Docker APT repository on each Ubuntu system. Docker supports both Ubuntu 26.04 and 24.04 on amd64. Review any pre-existing Docker/containerd packages first. Resolve package conflicts through separate approval before continuing. Group membership in `docker` is root-equivalent and granted only to the owner-approved deployment account. These commands add the APT key and repository, install the packages, enable Docker and grant that account access. Reconnect to apply group membership. [Docker installation and supported Ubuntu releases](https://docs.docker.com/engine/install/ubuntu/) · [Docker group privileges](https://docs.docker.com/engine/install/linux-postinstall/#manage-docker-as-a-non-root-user)
+Use the signed Docker APT repository on each Ubuntu system. Docker supports both Ubuntu 26.04 and 24.04 on amd64. Review any pre-existing Docker/containerd packages first. Resolve package conflicts through separate approval before continuing. The Docker group is root-equivalent. These one-time commands are for the provisioning operator. Any operator group grant requires explicit approval. Provide the normal MediaDock commands with scoped access to owned services and fixed domain identities, keeping admin group access separate from the lifecycle identity. [Docker installation and supported Ubuntu releases](https://docs.docker.com/engine/install/ubuntu/) · [Docker group privileges](https://docs.docker.com/engine/install/linux-postinstall/#manage-docker-as-a-non-root-user)
 
 ```bash
 sudo apt-get update
@@ -216,8 +216,9 @@ SOURCES
 sudo apt-get update
 sudo apt-get install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 sudo systemctl enable --now docker
-sudo usermod -aG docker "$USER"
 ```
+
+The one-time operator can use `sudo docker` or an already approved Docker group identity for the remaining build and deployment commands. The lifecycle authorization is reviewed separately.
 
 On the **producer guest only**, install `ffmpeg` for native synthetic fixture generation. Both guest releases should retain at least 2 GiB free before loading new images or starting scenarios. Check `df -h /var/lib`, `docker system df`, `docker compose version`, and `docker info --format '{{.Name}} {{.ID}}'` in each guest after reconnecting.
 

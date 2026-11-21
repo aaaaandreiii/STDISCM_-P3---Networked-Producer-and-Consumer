@@ -100,11 +100,12 @@ After authorized provisioning, validate the libvirt service account with `virt-h
 
 ## Required P5 Mac demo behavior
 
-- `./demo.sh` on Mac is a self-contained driver; laptop must already be powered on and reachable. If approved, script can `virsh start` *existing* stopped VMs via Ubuntu host, but **cannot** wake a powered-off physical laptop without explicit Wake-on-LAN configuration.
+- `./demo.sh start` and the complete default demo require a powered-on Acer. They start or resume only the approved existing MediaDock domains and verify readiness.
 - SSH through jump host to check two guest identities; use dedicated Docker daemons in both VMs. Ensure consumer containers healthy/restart stopped ones. `docker compose up -d` is safe for named volumes; no `down -v`.
-- Set up and maintain a scoped localhost TCP forward to consumer web UI (recommended `127.0.0.1:8080` and optional `8081`); verify forwarding is actually live, do not kill unrelated port occupants. `open http://127.0.0.1:8080` on macOS opens the GUI. `--status` must not create a tunnel.
+- Set up and maintain a scoped localhost TCP forward to consumer web UI (recommended `127.0.0.1:8080` and optional `8081`); verify forwarding is actually live, do not kill unrelated port occupants. `open http://127.0.0.1:8080` on macOS opens the GUI. `status` reports tunnel state without changes.
 - Generate/upload run-unique FFmpeg fixtures via producer VM container, verify normal `p/c/q`, overflow, duplicate and compression conditions, HTTP byte range, actual 10-second previews, full video playback and persistence; preserve logs/evidence.
-- A repeated single command reuses healthy containers, starts stopped containers, and preserves data. Prebuild images on the Ubuntu host during preparation and install them in the guests before class. No manual helper commands during the actual demo.
+- `./demo.sh stop` drains MediaDock work, gracefully powers off both MediaDock guests, closes only the owned tunnel and reports the Acer resource delta. The physical Acer stays up. See the [P5 lifecycle contract](07_ONE_COMMAND_DEMO_SPEC.md).
+- Repeated commands reuse healthy services, reconcile stopped containers, and preserve data. Prebuild images on the Ubuntu host during preparation and install them in the guests before class. No manual helper commands during the actual demo.
 
 ## Fallback if the Acer reaches its limits
 

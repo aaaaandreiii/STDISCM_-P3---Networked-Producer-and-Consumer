@@ -4,14 +4,17 @@ Run the native gate on the Acer's Ubuntu 26.04 amd64 installation. Run the Noble
 
 ## Verify the SSH login
 
-The owner confirmed an interactive login from the Mac. The Codex sandbox denied the first socket attempt. With network permission, Codex reached the SSH server, verified its existing host key and received `Permission denied (publickey,password)` in BatchMode. The Mac's agent reported zero loaded identities. A working interactive login can run the commands below after approval. Codex automation needs an existing authorized key or separate approval for a dedicated key.
+The owner confirmed an interactive login from the Mac. The Codex sandbox denied the first socket attempt. With network permission, Codex reached the SSH server, verified its existing host key and received `Permission denied (publickey,password)` in BatchMode. The Mac's agent reported zero loaded identities. The owner is setting up a dedicated identity. A subsequent sandbox-exempt file check found it absent, so the key-based attempt is pending. An authenticated interactive login can run the commands below after approval.
 
-From the Mac, use the verified Acer login destination. With the same known host key already recorded under the previous address, `HostKeyAlias` can preserve strict host-key verification. Check the authenticated username, release and architecture before using the Acer commands.
+From the Mac, use the verified Acer login destination. With the same known host key already recorded under the previous address, `HostKeyAlias` can preserve strict host-key verification. Once the dedicated public key is authorized on the Acer, run one bounded BatchMode check using the Mac identity. Check the authenticated username, hostname, release and architecture before using the Acer commands.
 
 ```bash
-ssh -T -o ConnectTimeout=5 -o StrictHostKeyChecking=yes \
-  -o HostKeyAlias="$ACER_PREVIOUS_ADDRESS" "$UBUNTU_LAPTOP_SSH" \
-  'id -un && . /etc/os-release && printf "%s\n" "$PRETTY_NAME" && uname -m'
+test -r "$HOME/.ssh/id_ed25519_mediadock" &&
+ssh -T -i "$HOME/.ssh/id_ed25519_mediadock" \
+  -o BatchMode=yes -o IdentitiesOnly=yes -o PreferredAuthentications=publickey \
+  -o ConnectTimeout=5 -o ConnectionAttempts=1 -o StrictHostKeyChecking=yes \
+  -o HostKeyAlias="$ACER_PREVIOUS_ADDRESS" -o UpdateHostKeys=no "$UBUNTU_LAPTOP_SSH" \
+  'id -un && hostname && . /etc/os-release && printf "%s\n" "$PRETTY_NAME" && uname -m'
 ```
 
 ## Approval 1 — install the native toolchain on the Acer
@@ -25,7 +28,7 @@ test "${VERSION_CODENAME:-}" = resolute
 test "$(dpkg --print-architecture)" = amd64
 
 native_packages=(
-  build-essential cmake ninja-build pkg-config ca-certificates curl ffmpeg
+  build-essential cmake ninja-build pkg-config ffmpeg
   libsqlite3-dev libssl-dev libprotobuf-dev protobuf-compiler
   libgrpc++-dev protobuf-compiler-grpc libdrogon-dev
   libbrotli-dev libhiredis-dev libjsoncpp-dev libmariadb-dev libpq-dev
@@ -51,14 +54,15 @@ IMAGE_REVISION=$(git rev-parse HEAD)
 printf 'Staging %s\n' "$IMAGE_REVISION"
 
 git archive "$IMAGE_REVISION" .dockerignore CMakeLists.txt docker infra proto src tests web |
-  ssh -T -o StrictHostKeyChecking=yes -o HostKeyAlias="$ACER_PREVIOUS_ADDRESS" \
+  ssh -T -i "$HOME/.ssh/id_ed25519_mediadock" -o IdentitiesOnly=yes -o BatchMode=yes \
+    -o ConnectTimeout=5 -o StrictHostKeyChecking=yes -o HostKeyAlias="$ACER_PREVIOUS_ADDRESS" \
     "$UBUNTU_LAPTOP_SSH" \
     "set -eu; release=mediadock/releases/$IMAGE_REVISION; mkdir -p mediadock/releases; mkdir \"\$release\"; tar -xf - -C \"\$release\"; printf '%s\\n' '$IMAGE_REVISION' > \"\$release/.source-revision\""
 ```
 
 ## Run native CMake and CTest on the Acer
 
-Use the staged directory displayed above. CTest must run both tests in every configuration. A skipped test fails the gate. Record package versions and host memory, swap and disk during the run. Start the next build only with at least 1 GiB `MemAvailable` and 12 GiB available on the build filesystem.
+Use the staged directory displayed above. Build the full application once in each of two clean configurations, Debug and Release. Their configurations already build the core tests and pipeline test. CTest must run both tests in every configuration. A skipped test fails the gate. Record package versions and host memory, swap and disk during the run. Start the next build only with at least 1 GiB `MemAvailable` and 12 GiB available on the build filesystem.
 
 ```bash
 set -euo pipefail
@@ -77,6 +81,7 @@ sample_resources() {
   date -Is
   free -h
   df -hP "$PWD" /var/lib
+  vmstat 1 2
 }
 check_headroom() {
   awk '/^MemAvailable:/ {exit !($2 >= 1048576)}' /proc/meminfo
@@ -86,26 +91,22 @@ check_headroom() {
 monitor_pid=$!
 trap 'kill "$monitor_pid" 2>/dev/null || true' EXIT
 
-for full in OFF ON; do
-  for config in Debug Release; do
-    check_headroom
-    build="$evidence/$full-$config"
-    cmake -S . -B "$build" -G Ninja -DBUILD_FULL_APP="$full" -DBUILD_TESTING=ON -DCMAKE_BUILD_TYPE="$config" \
-      2>&1 | tee "$evidence/$full-$config-configure.log"
-    cmake --build "$build" --parallel 1 2>&1 | tee "$evidence/$full-$config-build.log"
-    ctest --test-dir "$build" --output-on-failure --no-tests=error --parallel 1 \
-      --output-junit "$evidence/$full-$config-ctest.xml" 2>&1 | tee "$evidence/$full-$config-ctest.log"
-    grep -q 'name="media_core_tests"' "$evidence/$full-$config-ctest.xml"
-    grep -q 'name="media_pipeline_smoke"' "$evidence/$full-$config-ctest.xml"
-    if grep -q '<skipped' "$evidence/$full-$config-ctest.xml"; then
-      printf 'A required CTest test was skipped in %s/%s\n' "$full" "$config" >&2
-      exit 1
-    fi
-    if [ "$full" = ON ]; then
-      test -x "$build/media_producer"
-      test -x "$build/media_consumer"
-    fi
-  done
+for config in Debug Release; do
+  check_headroom
+  build="$evidence/$config"
+  cmake -S . -B "$build" -G Ninja -DBUILD_FULL_APP=ON -DBUILD_TESTING=ON -DCMAKE_BUILD_TYPE="$config" \
+    2>&1 | tee "$evidence/$config-configure.log"
+  cmake --build "$build" --parallel 1 2>&1 | tee "$evidence/$config-build.log"
+  ctest --test-dir "$build" --output-on-failure --no-tests=error --parallel 1 \
+    --output-junit "$evidence/$config-ctest.xml" 2>&1 | tee "$evidence/$config-ctest.log"
+  grep -q 'name="media_core_tests"' "$evidence/$config-ctest.xml"
+  grep -q 'name="media_pipeline_smoke"' "$evidence/$config-ctest.xml"
+  if grep -q '<skipped' "$evidence/$config-ctest.xml"; then
+    printf 'A required CTest test was skipped in %s\n' "$config" >&2
+    exit 1
+  fi
+  test -x "$build/media_producer"
+  test -x "$build/media_consumer"
 done
 printf 'Native evidence: %s\n' "$evidence"
 ```
@@ -130,6 +131,8 @@ for package in docker.io docker-compose docker-compose-v2 docker-doc docker-buil
 done
 test ! -e /etc/apt/keyrings/docker.asc
 test ! -e /etc/apt/sources.list.d/docker.sources
+sudo apt-get update
+sudo apt-get install --no-install-recommends --no-remove ca-certificates curl
 key_dir=$(mktemp -d)
 curl -fLsS https://download.docker.com/linux/ubuntu/gpg -o "$key_dir/docker.asc"
 sudo install -d -m 0755 /etc/apt/keyrings

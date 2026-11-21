@@ -53,10 +53,14 @@
 | R02 | Terminate producer mid-stream, restart it | No corrupt READY, retries logical job sensibly; temp cleanup/recovery documented | P6 |
 | R03 | Terminate consumer during queued/processing, restart | Best-effort recovery as documented; no dishonest exactly-once claim | P6 |
 | R04 | Read-only/unwritable volume, invalid media, disk-pressure simulation safely | Service fails gracefully; no uncontrolled data deletion or infinite block | P6 |
-| D01 | Fresh VMs with Docker installed, `./demo.sh` from configured host | Builds/starts images/containers, seeds uploads/tests and exposes GUI in one call | P5/P7 |
-| D02 | Re-run `./demo.sh` without reset | Detects/resumes containers/volumes, runs fresh test scenarios or clearly skips, preserves old READY | P5/P7 |
+| D01 | Fresh VMs with Docker installed, `./demo.sh` from configured host | Starts/reuses guests and preloaded images, seeds uploads/tests and exposes GUI in one call | P5/P7 |
+| D02 | Re-run `./demo.sh` without reset | Detects/resumes containers and volumes, runs fresh tests and preserves old READY | P5/P7 |
 | D03 | Offline demo rehearsal after images/preconditions cached | No hidden remote downloads/build dependency; actionable preflight errors | P7 |
-| D04 | Destroying flags unsupported by default; intentional reset requires confirmation | No implicit `docker compose down -v`, DB/media persisted | P5 |
+| D04 | Cold and warm `./demo.sh start`, including an individually stopped container | Real gRPC and GUI ready, owned tunnel reused, no demo scenarios triggered | P5/P7 |
+| D05 | `./demo.sh status` during operation and after stop | Accurate Acer resources, guests, Docker, health, tunnel and evidence without mutation | P5/P7 |
+| D06 | `./demo.sh stop` with work in progress, then repeat and restart | Graceful drain and verified shutoff, only owned tunnel closed, observed resource delta and persistent DB/media/evidence | P5/P6/P7 |
+| D07 | Stop with an undrainable job, other active workload, or a guest shutdown timeout | Clear nonzero status, data preserved, no forced shutdown or disruption of unrelated workloads | P5/P6 |
+| D08 | Run all four modes from a fresh Mac terminal | Scoped access and no password or sudo prompts, unrelated containers/VMs/SSH sessions unchanged | P5/P7 |
 
 ## Instrumentation / evidence schema
 

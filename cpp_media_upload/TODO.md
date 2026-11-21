@@ -7,11 +7,12 @@
 - [x] User approved phased implementation and two-VM Docker deployment on 2026-11-21 (see `docs/02_DECISIONS_AND_APPROVAL.md`).
 - [x] Host identified: macOS base-model M4 MacBook Air; Ubuntu spare laptop already SSH-reachable; no Ubuntu VMs yet.
 - [x] P0 development gate: record owner-verified Acer inventory and approve two resource-limited Ubuntu Server 24.04 guests.
-- [ ] Before deployment: verify SSH from Codex, KVM API and device permissions, configured apt candidates and safe resource limits. Use [a separate amd64 builder or KVM host](docs/10_MAC_UBUNTU_HOST_TOPOLOGY.md#fallback-if-the-acer-reaches-its-limits) if needed.
+- [ ] Verify the dedicated Codex SSH identity with BatchMode. Obtain separate approvals for the [Acer native toolchain, Docker install](docs/UBUNTU_BUILD_GATE.md) and [KVM/libvirt provisioning](docs/VM_SETUP.md).
+- [ ] Before deployment: verify KVM API and device permissions, configured apt candidates and safe resource limits. Use [a separate amd64 builder or KVM host](docs/10_MAC_UBUNTU_HOST_TOPOLOGY.md#fallback-if-the-acer-reaches-its-limits) if needed.
 - [x] Confirmed two separate Ubuntu VMs with Docker containers inside each are acceptable. Single-host Docker mode is test-only.
 - [ ] P0: verify ports 50051/8080/50052/8081, test media acceptance; confirm exact privileged host/VM installation steps before executing them (plan approved, unattended sudo not automatically approved).
 - [ ] P0/P3: establish guest SSH identities, private VM network, Mac-to-guest jump host access, Mac GUI localhost SSH tunnel.
-- [ ] P5: `./demo.sh` on macOS automatically brings up **existing guests** if stopped (authorized noninteractive libvirt start), starts/reuses containers on each VM, and opens GUI over managed SSH tunnel.
+- [ ] P5: implement the exact Mac interface `./demo.sh start`, `./demo.sh`, `./demo.sh stop`, and `./demo.sh status` with narrowly scoped noninteractive authorization.
 - [ ] P5/P7: verify Ubuntu physical laptop remains powered on/reachable; fail clearly otherwise (no assumption of Wake-on-LAN).
 - [ ] Capture instructor test cases when available; append requirements without silently redesigning core architecture.
 
@@ -22,7 +23,7 @@
 - [ ] **P2** gRPC concurrency/producer/consumer correctness and real integration tests — Agent A.
 - [ ] **P3** Docker/Compose and VM setup merged. Ubuntu image build and guest rollout gates pending.
 - [ ] **P4** Drogon HTTP, gallery preview/playback/browser+Range verification — Agent B.
-- [ ] **P5** Fully automated one-command `./demo.sh`, reproducible fixtures, idempotent reruns and failure diagnostics — Agent B.
+- [ ] **P5** One-command `./demo.sh` lifecycle, seeded demo, idempotent reruns, graceful stop and read-only status — Agent B.
 - [ ] **P6** Cross-VM reliability, restart/partial upload recovery, saturation + duplicate race validation — Agent A, master integration.
 - [ ] **P7** Master merge, two-VM full acceptance, final README/build/test docs, offline demo rehearsal and freeze.
 
@@ -38,7 +39,11 @@
 - [ ] Duplicate SHA-256 rejected even across differently named files, while same-name/different-bytes uploads both succeed.
 - [ ] Compression-on test validates playable video, final-vs-original size; compression-off test validates already-compatible MP4; do not claim all files shrink.
 - [ ] Stopped/restarted containers preserve READY media, DB and source samples; incomplete upload/crash behavior documented.
-- [ ] First-run and subsequent `./demo.sh` paths both run in **one command** after the documented one-time VM preparation.
+- [ ] Cold `./demo.sh start` brings up both pre-provisioned guests and reaches gRPC and GUI readiness without running demo scenarios; repeated start reuses healthy resources and recovers an individually stopped container.
+- [ ] First and subsequent complete demos work from a fresh Mac terminal without passwords or manual setup commands.
+- [ ] `./demo.sh status` reports Acer resources, VM and container states, consumer health, tunnel and recent evidence without mutation.
+- [ ] Repeated `./demo.sh stop` drains active work, gracefully stops only MediaDock services and guests, confirms shutoff, closes only its tunnel, and reports measured resource change. Verify timeout, intact files across stop/start and unchanged unrelated workloads.
+- [ ] Keep at least 10 GiB of host storage free, aim for the 12 GiB working floor, avoid concurrent heavy workloads and preserve the physical Acer and its existing SSH sessions.
 - [ ] `./demo.sh` verifies prerequisites before making changes, shows actionable failures, prints GUI address, writes evidence, preserves prior data, never silently deletes volumes.
 - [ ] Relevant logs/commands and observed results stored in a test report; no false “passed” entries.
 
@@ -51,7 +56,7 @@
 
 ## Hold points
 
-1. Complete Wave 1 development as approved. Show exact one-time setup operations for explicit approval before deploying.
+1. Complete approved native Debug/Release CMake and CTest, then separately approved Docker builds before Wave 2. Show exact independently approved VM setup operations before provisioning.
 2. After P1+P3, do not merge incompatible Docker/CMake assumptions without a compile test.
 3. After P2+P4, recheck API URLs and HTTP/Protobuf contracts.
 4. After P5+P6, run a **fresh** two-VM demo and a **rerun** preserving data before P7 sign-off.

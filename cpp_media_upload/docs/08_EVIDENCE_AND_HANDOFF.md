@@ -39,7 +39,7 @@ No actual test report is supplied by this planning document. Original tests were
 4. Run `./demo.sh` again with containers/media already present; verify old videos and DB survive, and current run still produces expected evidence.
 5. Run a negative preflight by making a simulated required dependency unavailable; ensure clear error/nonzero exit and no destructive action.
 6. Verify overload consumer has separate volume, deliberate worker delay, distinct ports, and queue saturation reliably occurs.
-7. Check service logs for secrets, crashes, critical warnings; record known nonblocking limitations.
+7. Run the lifecycle acceptance rows D04–D08, including fresh terminal auth, graceful and repeated stop, read-only status, preserved data, unchanged unrelated workloads and measured reclaimed memory. Check service logs for secrets, crashes and critical warnings.
 
 ## P7 final review checklist
 
