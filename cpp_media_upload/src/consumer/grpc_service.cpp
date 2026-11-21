@@ -7,6 +7,7 @@
 #include <iomanip>
 #include <memory>
 #include <sstream>
+#include <stdexcept>
 namespace fs = std::filesystem;
 namespace proto = mediaupload::v1;
 namespace media {
@@ -35,21 +36,28 @@ grpc::Status UploadService::UploadVideo(grpc::ServerContext* ctx,
     reply->set_result(proto::SERVER_BUSY); reply->set_message("Maximum concurrent incoming uploads reached");
     return grpc::Status::OK;
   }
-  const auto invalid = [&](const std::string& reason) {
-    reply->set_result(proto::INVALID_FILE); reply->set_message(reason);
+  const auto reject = [&](proto::UploadResult result, const std::string& reason) {
+    reply->set_result(result); reply->set_message(reason);
     return grpc::Status::OK;
   };
   proto::UploadRequest request;
-  if (!reader->Read(&request) || !request.has_metadata()) return invalid("First message must be metadata");
+  if (!reader->Read(&request) || !request.has_metadata())
+    return reject(proto::INVALID_FILE, "First message must be metadata");
   const proto::UploadMetadata header = request.metadata();
   reply->set_upload_id(header.upload_id());
   if (!valid_token(header.upload_id()) || !valid_token(header.producer_id()) ||
       header.original_filename().empty() || header.original_filename().size() > 1024 ||
       header.total_size_bytes() == 0 || header.total_size_bytes() > app_.config_.max_file_bytes)
-    return invalid("Invalid metadata, zero size, or exceeds maximum allowed upload");
+    return reject(proto::INVALID_FILE, "Invalid metadata, zero size, or exceeds maximum allowed upload");
   const std::string id = random_hex();
   const std::string temp_name = id + ".part";
   const fs::path path = app_.incoming() / temp_name;
+  const auto reject_transfer = [&](proto::UploadResult result, const std::exception& error) {
+    std::error_code ec;
+    fs::remove(path, ec);
+    log_line("receiver", "rejected upload=" + header.upload_id() + " error=" + error.what());
+    return reject(result, error.what());
+  };
   std::uint64_t received = 0;
   unsigned char digest[EVP_MAX_MD_SIZE]{}; unsigned digest_len = 0;
   std::unique_ptr<EVP_MD_CTX, decltype(&EVP_MD_CTX_free)> hash(EVP_MD_CTX_new(), &EVP_MD_CTX_free);
@@ -60,13 +68,13 @@ grpc::Status UploadService::UploadVideo(grpc::ServerContext* ctx,
       std::ofstream output(path, std::ios::binary | std::ios::trunc);
       if (!output) throw std::runtime_error("Cannot create temporary file");
       while (reader->Read(&request)) {
-        if (ctx->IsCancelled()) throw std::runtime_error("Client cancelled upload");
-        if (!request.has_chunk()) throw std::runtime_error("Unexpected metadata or missing chunk");
+        if (ctx->IsCancelled()) throw std::invalid_argument("Client cancelled upload");
+        if (!request.has_chunk()) throw std::invalid_argument("Unexpected metadata or missing chunk");
         const auto& chunk = request.chunk();
         if (chunk.empty() || chunk.size() > 256 * 1024 ||
             received + chunk.size() > header.total_size_bytes() ||
             received + chunk.size() > app_.config_.max_file_bytes)
-          throw std::runtime_error("Chunk invalid or declared file size exceeded");
+          throw std::invalid_argument("Chunk invalid or declared file size exceeded");
         output.write(chunk.data(), static_cast<std::streamsize>(chunk.size()));
         if (!output || EVP_DigestUpdate(hash.get(), chunk.data(), chunk.size()) != 1)
           throw std::runtime_error("Write or SHA-256 failed");
@@ -75,8 +83,8 @@ grpc::Status UploadService::UploadVideo(grpc::ServerContext* ctx,
       output.flush();
       if (!output) throw std::runtime_error("Temporary file flush failed");
     }
-    if (ctx->IsCancelled()) throw std::runtime_error("Upload interrupted by client");
-    if (received != header.total_size_bytes()) throw std::runtime_error("Received bytes do not match declared size");
+    if (ctx->IsCancelled()) throw std::invalid_argument("Upload interrupted by client");
+    if (received != header.total_size_bytes()) throw std::invalid_argument("Received bytes do not match declared size");
     if (EVP_DigestFinal_ex(hash.get(), digest, &digest_len) != 1)
       throw std::runtime_error("Final SHA-256 failed");
     const std::string sha = to_hex(digest, digest_len);
@@ -120,10 +128,10 @@ grpc::Status UploadService::UploadVideo(grpc::ServerContext* ctx,
     reply->set_queue_depth(static_cast<std::uint32_t>(app_.queue_.size()));
     if (reply->result() != proto::QUEUED) fs::remove(path);
     return grpc::Status::OK;
-  } catch (const std::exception& e) {
-    std::error_code ec; fs::remove(path, ec);
-    log_line("receiver", "rejected upload=" + header.upload_id() + " error=" + e.what());
-    return invalid(e.what());
+  } catch (const std::invalid_argument& error) {
+    return reject_transfer(proto::INVALID_FILE, error);
+  } catch (const std::exception& error) {
+    return reject_transfer(proto::SERVER_ERROR, error);
   }
 }
 grpc::Status UploadService::GetUploadStatus(grpc::ServerContext*,

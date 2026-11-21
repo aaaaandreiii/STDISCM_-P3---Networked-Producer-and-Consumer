@@ -7,6 +7,7 @@
 #include <stdexcept>
 #include <syncstream>
 #include <thread>
+#include <unordered_set>
 namespace fs = std::filesystem;
 namespace media {
 void log_line(const std::string& component, const std::string& message) {
@@ -26,7 +27,30 @@ void ConsumerApp::start_workers() {
     workers_.emplace_back([this, i] { worker_loop(i + 1); });
 }
 void ConsumerApp::recover_unfinished() {
-  for (const Video& v : database_.unfinished_videos()) {
+  const auto unfinished = database_.unfinished_videos();
+  std::unordered_set<std::string> pending_parts;
+  for (const Video& v : unfinished) pending_parts.insert(v.temp_name);
+
+  // Startup runs before gRPC listens. A generated .part outside the pending
+  // rows cannot be resumed after a crash and no receiver is still writing it.
+  try {
+    for (const auto& entry : fs::directory_iterator(incoming())) {
+      const auto name = entry.path().filename().string();
+      if (name.size() != 37 || !name.ends_with(".part") ||
+          name.find_first_not_of("0123456789abcdef") != 32 || pending_parts.contains(name) ||
+          !fs::is_regular_file(entry.symlink_status()))
+        continue;
+      std::error_code error;
+      if (fs::remove(entry.path(), error))
+        log_line("recovery", "removed unreferenced upload temp=" + name);
+      else if (error)
+        log_line("recovery", "cannot remove upload temp=" + name + " error=" + error.message());
+    }
+  } catch (const fs::filesystem_error& error) {
+    log_line("recovery", "cannot scan incoming upload temps: " + std::string(error.what()));
+  }
+
+  for (const Video& v : unfinished) {
     const fs::path final_path = uploads() / (v.id + ".mp4");
     const fs::path preview_path = previews() / (v.id + ".mp4");
     const fs::path thumb_path = previews() / (v.id + ".jpg");
