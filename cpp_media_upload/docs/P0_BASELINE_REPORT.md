@@ -167,3 +167,18 @@ The owner ran the original staged runner. Evidence `build-image-evidence.MAPAGV`
 The corrected runner at `.approval2-r2/` stages the same verified source revision `917a621` and leaves the original runner and evidence intact. The snapshot now calls `docker container inspect` without a formatter and reduces its JSON to deterministic state, start time, restart count and optional health fields. It validates the expected container IDs and omits raw inspect data from the evidence.
 
 `bash -n` passed for the runner and regression script. `bash tests/e2e/docker-container-snapshot.sh` passed using a Docker stub that accepted only the read-only inspect operation, covering configured and missing health, stopped containers, restart changes, identity validation and redaction. `bash tests/e2e/docker-config.sh` also passed. The attempted live inspection of the recorded baseline was denied by noninteractive sudo, so live verification remains pending the interactive retry. Neither image build, label check nor isolated help run has yet been verified. Wave 2 remains on hold.
+
+### Approval 2 — image gate PASS and Wave 2 release
+
+The owner ran the corrected runner on the Acer; `build-image-evidence.csVIPo/gate.exit` and the SSH command both reported 0. The source marker and both image labels were exactly `917a6218d499632fe3a3c6a836ab7ffaed9349cd`. The build used the local Docker driver with Docker 29.10.0, Buildx 0.39.1 and Compose 5.8.0. Commands and exit codes were verified from the saved logs.
+
+| Image | Compose build | OCI revision and platform | Isolated executable check | Image ID prefix and size |
+|---|---|---|---|---|
+| Producer | Exit 0 | `917a621`, linux/amd64 | `docker run --rm --network none … --help`, exit 0 | `a3cb314ee8bf`, 149,538,192 B |
+| Consumer | Exit 0 | `917a621`, linux/amd64 | `docker run --rm --network none … --help`, exit 0 | `84a243faff75`, 791,834,661 B |
+
+The Noble builder ran two CTest cases with both passed. The producer log recorded a package warning for a missing compiler man-page link and a CMake developer warning for Drogon's deprecated `exec_program` in `FindJsoncpp.cmake`. Both were nonfatal. The consumer build reused cached layers and had no warnings matching the log scan.
+
+The lowest sampled available RAM was 4.79 GiB for producer and 5.22 GiB for consumer. Minimum free disk was 47.74 and 47.14 GiB respectively, above the 18 GiB cutoff and 15 GiB reserve. All 81 samples recorded zero swap use or movement and zero full-memory pressure in the 10-second PSI metric. Docker's reported total image size rose from 1.602 to 2.395 GB and build cache from 503.4 MB to 1.749 GB. Docker counts remained five running containers and one local volume. Both full running-container ID sets matched, and every baseline container's state, start time, restart count and reported health matched byte-for-byte. The other project's application-level health was not tested.
+
+Acer evidence is in `build-image-evidence.csVIPo` under the staged release. Selected logs without unrelated container identities were copied to `.demo-evidence/approval2-917a621/csVIPo/`. The previous failed run remains intact. Approval 2 is complete. Wave 2 authorizes Agent A P2 and Agent B P4 in their existing worktrees. Actual guests, networking and two-VM verification remain behind Approval 3.

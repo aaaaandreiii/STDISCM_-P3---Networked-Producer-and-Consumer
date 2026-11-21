@@ -1,6 +1,6 @@
 # Acer Ubuntu build gate
 
-Run the native gate on the Acer's Ubuntu 26.04 amd64 installation. Run the Noble container image builds on that same laptop after the native gate passes. The owner approved the exact native toolchain commands in Approval 1. The native gate passed. The owner granted Approval 2 for the scoped image gate using the Acer’s existing Docker installation. Workspace setup, builds, and checks use one job at a time. VM provisioning has its own approval and follows the native gate.
+Run the native gate on the Acer's Ubuntu 26.04 amd64 installation. Run the Noble container image builds on that same laptop after the native gate passes. The owner approved the exact native toolchain commands in Approval 1. The native gate passed. Approval 2 passed for both MediaDock images using the Acer’s existing Docker installation. See the [observed results](P0_BASELINE_REPORT.md#approval-2--image-gate-pass-and-wave-2-release). Workspace setup, builds, and checks use one job at a time. VM provisioning has its own approval and follows the native gate.
 
 ## Verify the SSH login
 
