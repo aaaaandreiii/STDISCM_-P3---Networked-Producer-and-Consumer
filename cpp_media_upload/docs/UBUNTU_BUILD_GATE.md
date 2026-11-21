@@ -1,10 +1,10 @@
 # Acer Ubuntu build gate
 
-Run the native gate on the Acer's Ubuntu 26.04 amd64 installation. Run the Noble container image builds on that same laptop after the native gate passes. Both package-install sections are proposed for explicit approval. Workspace setup, builds, and checks use one job at a time. VM provisioning has its own approval and follows the native gate.
+Run the native gate on the Acer's Ubuntu 26.04 amd64 installation. Run the Noble container image builds on that same laptop after the native gate passes. The owner approved the exact native toolchain commands in Approval 1. Docker installation is pending a separate approval. Workspace setup, builds, and checks use one job at a time. VM provisioning has its own approval and follows the native gate.
 
 ## Verify the SSH login
 
-The owner confirmed an interactive login from the Mac. The Codex sandbox denied the first socket attempt. With network permission, Codex reached the SSH server, verified its existing host key and received `Permission denied (publickey,password)` in BatchMode. The Mac's agent reported zero loaded identities. The owner is setting up a dedicated identity. A subsequent sandbox-exempt file check found it absent, so the key-based attempt is pending. An authenticated interactive login can run the commands below after approval.
+The owner confirmed an interactive login from the Mac. The Codex sandbox denied the first socket attempt. With network permission, Codex reached the SSH server, verified its existing host key and received `Permission denied (publickey,password)` in BatchMode. The Mac's agent reported zero loaded identities. The owner is setting up a dedicated identity. The latest sandbox-exempt check found the dedicated key absent and the SSH agent empty, so the key-based attempt is pending. The owner can use an authenticated interactive session to run Approval 1.
 
 From the Mac, use the verified Acer login destination. With the same known host key already recorded under the previous address, `HostKeyAlias` can preserve strict host-key verification. Once the dedicated public key is authorized on the Acer, run one bounded BatchMode check using the Mac identity. Check the authenticated username, hostname, release and architecture before using the Acer commands.
 
@@ -19,7 +19,7 @@ ssh -T -i "$HOME/.ssh/id_ed25519_mediadock" \
 
 ## Approval 1 — install the native toolchain on the Acer
 
-Run on the Acer as the authenticated deployment user. The package list uses the Ubuntu repositories already configured on the laptop. If APT reports missing candidates or proposed removals, stop and inspect its output. [Ubuntu gRPC packages](https://packages.ubuntu.com/en/source/resolute/grpc) · [Ubuntu Drogon package](https://packages.ubuntu.com/libdrogon-dev) · [Ubuntu Protobuf compiler](https://packages.ubuntu.com/resolute/protobuf-compiler)
+Approved by the owner. Run on the Acer as the authenticated deployment user. The package list uses the Ubuntu repositories already configured on the laptop. If APT reports missing candidates or proposed removals, stop and inspect its output. [Ubuntu gRPC packages](https://packages.ubuntu.com/en/source/resolute/grpc) · [Ubuntu Drogon package](https://packages.ubuntu.com/libdrogon-dev) · [Ubuntu Protobuf compiler](https://packages.ubuntu.com/resolute/protobuf-compiler)
 
 ```bash
 set -euo pipefail
@@ -62,7 +62,7 @@ git archive "$IMAGE_REVISION" .dockerignore CMakeLists.txt docker infra proto sr
 
 ## Run native CMake and CTest on the Acer
 
-Use the staged directory displayed above. Build the full application once in each of two clean configurations, Debug and Release. Their configurations already build the core tests and pipeline test. CTest must run both tests in every configuration. A skipped test fails the gate. Record package versions and host memory, swap and disk during the run. Start the next build only with at least 1 GiB `MemAvailable` and 12 GiB available on the build filesystem.
+Use the staged directory displayed above. Build the full application once in each of two clean configurations, Debug and Release. Their configurations already build the core tests and pipeline test. CTest must run both tests in every configuration. A skipped test fails the gate. Record package versions and host memory, swap and disk during the run. Start the next build only with at least 1 GiB `MemAvailable` and 12 GiB available on the build filesystem. The owner reported another project running and allowed stopping it if necessary. Measure headroom first and leave that project running if the gate fits.
 
 ```bash
 set -euo pipefail

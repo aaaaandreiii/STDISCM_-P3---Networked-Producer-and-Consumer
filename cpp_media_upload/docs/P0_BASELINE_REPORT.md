@@ -121,3 +121,5 @@ The owner verified the Acer's current address, direct Mac-to-Acer TCP, an active
 ### Dedicated key and native build preparation
 
 The owner identified the dedicated Mac identity path. The sandbox-exempt presence check found the file absent and made no SSH connection. Current native installation commands are ready for Approval 1, and the serial matrix uses two full application builds with CTest, Debug and Release. Docker package installation and guest provisioning retain separate holds. Those Ubuntu tests remain NOT RUN.
+
+The owner subsequently approved Approval 1 and remote access. A sandbox-exempt credential check found the dedicated key absent and the agent empty, so it exited before contacting the Acer. Native installation, builds and CTest remain NOT RUN. The owner reported another project running and authorized stopping it only if the build needs the resources. Current host utilization remains unmeasured by Codex.
