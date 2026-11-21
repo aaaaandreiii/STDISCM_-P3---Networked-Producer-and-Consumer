@@ -1,0 +1,92 @@
+name: mediadock-consumer
+
+x-consumer: &consumer
+  image: "mediadock/consumer:${IMAGE_REVISION:?set the full source Git commit SHA}"
+  pull_policy: never
+  restart: unless-stopped
+  init: true
+  cpus: 1.75
+  mem_limit: 1600m
+  memswap_limit: 1600m
+  stop_grace_period: 5m
+  healthcheck:
+    test: ["CMD", "curl", "--fail", "--silent", "--max-time", "2", "http://127.0.0.1:8080/health"]
+    interval: 5s
+    timeout: 3s
+    retries: 6
+    start_period: 5s
+  logging:
+    driver: local
+    options:
+      max-size: "5m"
+      max-file: "3"
+
+services:
+  consumer:
+    <<: *consumer
+    ports:
+      - "${CONSUMER_PRIVATE_IP:?set the consumer guest private IPv4 address}:${GRPC_PORT:-50051}:50051"
+      - "${CONSUMER_PRIVATE_IP:?set the consumer guest private IPv4 address}:${HTTP_PORT:-8080}:8080"
+    volumes:
+      - consumer-data:/data
+    command:
+      - --c
+      - "${CONSUMER_COUNT:-2}"
+      - --q
+      - "${QUEUE_CAPACITY:-5}"
+      - --grpc-bind
+      - "0.0.0.0:50051"
+      - --http-host
+      - "0.0.0.0"
+      - --http-port
+      - "8080"
+      - --data
+      - /data
+      - --web
+      - /opt/mediadock/web
+      - --compress
+      - "${COMPRESS:-on}"
+      - --max-mb
+      - "${MAX_UPLOAD_MB:-128}"
+      - --max-inflight
+      - "${MAX_INFLIGHT:-8}"
+      - --ffmpeg-timeout
+      - "${FFMPEG_TIMEOUT_SEC:-120}"
+
+  consumer-overload:
+    <<: *consumer
+    profiles: [overload]
+    ports:
+      - "${CONSUMER_PRIVATE_IP:?set the consumer guest private IPv4 address}:${OVERLOAD_GRPC_PORT:-50052}:50051"
+      - "${CONSUMER_PRIVATE_IP:?set the consumer guest private IPv4 address}:${OVERLOAD_HTTP_PORT:-8081}:8080"
+    volumes:
+      - overload-data:/data
+    command:
+      - --c
+      - "1"
+      - --q
+      - "2"
+      - --grpc-bind
+      - "0.0.0.0:50051"
+      - --http-host
+      - "0.0.0.0"
+      - --http-port
+      - "8080"
+      - --data
+      - /data
+      - --web
+      - /opt/mediadock/web
+      - --compress
+      - "${COMPRESS:-on}"
+      - --max-mb
+      - "${MAX_UPLOAD_MB:-128}"
+      - --max-inflight
+      - "${MAX_INFLIGHT:-8}"
+      - --ffmpeg-timeout
+      - "${FFMPEG_TIMEOUT_SEC:-120}"
+      - --demo-delay-ms
+      - "2500"
+
+volumes:
+  consumer-data:
+  overload-data:
