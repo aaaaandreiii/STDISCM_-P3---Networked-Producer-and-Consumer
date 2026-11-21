@@ -1,0 +1,49 @@
+syntax = "proto3";
+
+package mediaupload.v1;
+
+service MediaUploadService {
+  rpc UploadVideo(stream UploadRequest) returns (UploadReply);
+  rpc GetUploadStatus(StatusRequest) returns (StatusReply);
+  rpc Health(HealthRequest) returns (HealthReply);
+}
+
+message UploadMetadata {
+  string upload_id = 1;
+  string producer_id = 2;
+  string original_filename = 3;
+  uint64 total_size_bytes = 4;
+}
+message UploadRequest {
+  oneof payload {
+    UploadMetadata metadata = 1;
+    bytes chunk = 2;
+  }
+}
+
+enum UploadResult {
+  UPLOAD_RESULT_UNSPECIFIED = 0;
+  QUEUED = 1;
+  QUEUE_FULL = 2;
+  DUPLICATE = 3;
+  INVALID_FILE = 4;
+  SERVER_BUSY = 5;
+  SERVER_ERROR = 6;
+  ALREADY_ACCEPTED = 7;
+}
+message UploadReply {
+  UploadResult result = 1;
+  string upload_id = 2;
+  string video_id = 3;
+  string message = 4;
+  uint32 queue_depth = 5;
+}
+message StatusRequest { string upload_id = 1; }
+message StatusReply {
+  bool found = 1;
+  string video_id = 2;
+  string state = 3;
+  string message = 4;
+}
+message HealthRequest {}
+message HealthReply { bool healthy = 1; string service = 2; }

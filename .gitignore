@@ -1,0 +1,12 @@
+# Operating System Files
+.DS_Store
+Thumbs.db
+
+# Chat / Web Archives (may contain credentials/tokens)
+*.webarchive
+
+# Build artifacts & logs
+build/
+build-*/
+*.log
+*.part
