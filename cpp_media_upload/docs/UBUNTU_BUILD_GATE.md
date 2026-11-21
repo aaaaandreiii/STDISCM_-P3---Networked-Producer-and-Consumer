@@ -1,0 +1,198 @@
+# Acer Ubuntu build gate
+
+Run the native gate on the Acer's Ubuntu 26.04 amd64 installation. Run the Noble container image builds on that same laptop after the native gate passes. Both package-install sections are proposed for explicit approval. Workspace setup, builds, and checks use one job at a time. VM provisioning has its own approval and follows the native gate.
+
+## Verify the SSH login
+
+The owner confirmed an interactive login from the Mac. The Codex sandbox denied the first socket attempt. With network permission, Codex reached the SSH server, verified its existing host key and received `Permission denied (publickey,password)` in BatchMode. The Mac's agent reported zero loaded identities. A working interactive login can run the commands below after approval. Codex automation needs an existing authorized key or separate approval for a dedicated key.
+
+From the Mac, use the verified Acer login destination. With the same known host key already recorded under the previous address, `HostKeyAlias` can preserve strict host-key verification. Check the authenticated username, release and architecture before using the Acer commands.
+
+```bash
+ssh -T -o ConnectTimeout=5 -o StrictHostKeyChecking=yes \
+  -o HostKeyAlias="$ACER_PREVIOUS_ADDRESS" "$UBUNTU_LAPTOP_SSH" \
+  'id -un && . /etc/os-release && printf "%s\n" "$PRETTY_NAME" && uname -m'
+```
+
+## Approval 1 — install the native toolchain on the Acer
+
+Run on the Acer as the authenticated deployment user. The package list uses the Ubuntu repositories already configured on the laptop. If APT reports missing candidates or proposed removals, stop and inspect its output. [Ubuntu gRPC packages](https://packages.ubuntu.com/en/source/resolute/grpc) · [Ubuntu Drogon package](https://packages.ubuntu.com/libdrogon-dev) · [Ubuntu Protobuf compiler](https://packages.ubuntu.com/resolute/protobuf-compiler)
+
+```bash
+set -euo pipefail
+. /etc/os-release
+test "${VERSION_CODENAME:-}" = resolute
+test "$(dpkg --print-architecture)" = amd64
+
+native_packages=(
+  build-essential cmake ninja-build pkg-config ca-certificates curl ffmpeg
+  libsqlite3-dev libssl-dev libprotobuf-dev protobuf-compiler
+  libgrpc++-dev protobuf-compiler-grpc libdrogon-dev
+  libbrotli-dev libhiredis-dev libjsoncpp-dev libmariadb-dev libpq-dev
+  libyaml-cpp-dev uuid-dev zlib1g-dev
+)
+sudo apt-get update
+apt-cache policy "${native_packages[@]}"
+sudo apt-get --simulate install --no-install-recommends --no-remove "${native_packages[@]}"
+sudo apt-get install --no-install-recommends --no-remove "${native_packages[@]}"
+```
+
+## Stage the reviewed revision from the Mac
+
+Run from the app directory of the `codex/integration` worktree. Use the SHA of the clean, reviewed revision for native and Docker tests. The command creates a fresh, user-owned source directory and stops if that release directory already exists. To rerun tests on an already staged revision, reuse it only after checking its provenance.
+
+```bash
+set -euo pipefail
+: "${UBUNTU_LAPTOP_SSH:?set the verified Acer SSH destination}"
+: "${ACER_PREVIOUS_ADDRESS:?set the known-host alias for the Acer}"
+test "$(git branch --show-current)" = codex/integration
+test -z "$(git status --porcelain)"
+IMAGE_REVISION=$(git rev-parse HEAD)
+printf 'Staging %s\n' "$IMAGE_REVISION"
+
+git archive "$IMAGE_REVISION" .dockerignore CMakeLists.txt docker infra proto src tests web |
+  ssh -T -o StrictHostKeyChecking=yes -o HostKeyAlias="$ACER_PREVIOUS_ADDRESS" \
+    "$UBUNTU_LAPTOP_SSH" \
+    "set -eu; release=mediadock/releases/$IMAGE_REVISION; mkdir -p mediadock/releases; mkdir \"\$release\"; tar -xf - -C \"\$release\"; printf '%s\\n' '$IMAGE_REVISION' > \"\$release/.source-revision\""
+```
+
+## Run native CMake and CTest on the Acer
+
+Use the staged directory displayed above. CTest must run both tests in every configuration. A skipped test fails the gate. Record package versions and host memory, swap and disk during the run. Start the next build only with at least 1 GiB `MemAvailable` and 12 GiB available on the build filesystem.
+
+```bash
+set -euo pipefail
+: "${IMAGE_REVISION:?set the staged Git SHA}"
+cd "$HOME/mediadock/releases/$IMAGE_REVISION"
+test "$(cat .source-revision)" = "$IMAGE_REVISION"
+evidence=$(mktemp -d "$PWD/build-gate-evidence.XXXXXX")
+g++ --version | sed -n '1p'
+cmake --version | sed -n '1p'
+ninja --version
+protoc --version
+ffmpeg -version | sed -n '1p'
+dpkg-query -W libgrpc++-dev libprotobuf-dev libdrogon-dev libtrantor-dev libsqlite3-dev libssl-dev
+
+sample_resources() {
+  date -Is
+  free -h
+  df -hP "$PWD" /var/lib
+}
+check_headroom() {
+  awk '/^MemAvailable:/ {exit !($2 >= 1048576)}' /proc/meminfo
+  df -Pk "$PWD" | awk 'NR == 2 {exit !($4 >= 12582912)}'
+}
+(while :; do sample_resources; sleep 10; done) > "$evidence/native-resources.log" &
+monitor_pid=$!
+trap 'kill "$monitor_pid" 2>/dev/null || true' EXIT
+
+for full in OFF ON; do
+  for config in Debug Release; do
+    check_headroom
+    build="$evidence/$full-$config"
+    cmake -S . -B "$build" -G Ninja -DBUILD_FULL_APP="$full" -DBUILD_TESTING=ON -DCMAKE_BUILD_TYPE="$config" \
+      2>&1 | tee "$evidence/$full-$config-configure.log"
+    cmake --build "$build" --parallel 1 2>&1 | tee "$evidence/$full-$config-build.log"
+    ctest --test-dir "$build" --output-on-failure --no-tests=error --parallel 1 \
+      --output-junit "$evidence/$full-$config-ctest.xml" 2>&1 | tee "$evidence/$full-$config-ctest.log"
+    grep -q 'name="media_core_tests"' "$evidence/$full-$config-ctest.xml"
+    grep -q 'name="media_pipeline_smoke"' "$evidence/$full-$config-ctest.xml"
+    if grep -q '<skipped' "$evidence/$full-$config-ctest.xml"; then
+      printf 'A required CTest test was skipped in %s/%s\n' "$full" "$config" >&2
+      exit 1
+    fi
+    if [ "$full" = ON ]; then
+      test -x "$build/media_producer"
+      test -x "$build/media_consumer"
+    fi
+  done
+done
+printf 'Native evidence: %s\n' "$evidence"
+```
+
+## Approval 2 — install Docker on the Acer
+
+This is the Acer-only portion of the existing signed Docker APT setup. Start this after the native gate passes. The commands add Docker's APT key and source, install Engine, Buildx and Compose, and start the daemon. Docker's standard bridge initialization can enable IP forwarding and add packet-filtering rules. The build gate uses `sudo docker` and publishes no ports. Existing Docker/containerd packages, APT sources or key paths require review before continuing. [Docker installation](https://docs.docker.com/engine/install/ubuntu/) · [Docker bridge packet filtering](https://docs.docker.com/engine/network/packet-filtering-firewalls/)
+
+```bash
+set -euo pipefail
+. /etc/os-release
+test "${VERSION_CODENAME:-}" = resolute
+test "$(dpkg --print-architecture)" = amd64
+
+for package in docker.io docker-compose docker-compose-v2 docker-doc docker-buildx \
+  podman-docker containerd runc docker-ce docker-ce-cli containerd.io \
+  docker-buildx-plugin docker-compose-plugin; do
+  if [ "$(dpkg-query -W -f='${db:Status-Status}' "$package" 2>/dev/null || true)" = installed ]; then
+    printf 'Review existing package %s before continuing\n' "$package" >&2
+    exit 1
+  fi
+done
+test ! -e /etc/apt/keyrings/docker.asc
+test ! -e /etc/apt/sources.list.d/docker.sources
+key_dir=$(mktemp -d)
+curl -fLsS https://download.docker.com/linux/ubuntu/gpg -o "$key_dir/docker.asc"
+sudo install -d -m 0755 /etc/apt/keyrings
+sudo install -m 0644 "$key_dir/docker.asc" /etc/apt/keyrings/docker.asc
+sudo tee /etc/apt/sources.list.d/docker.sources >/dev/null <<'SOURCES'
+Types: deb
+URIs: https://download.docker.com/linux/ubuntu
+Suites: resolute
+Components: stable
+Architectures: amd64
+Signed-By: /etc/apt/keyrings/docker.asc
+SOURCES
+
+sudo apt-get update
+sudo apt-get install --no-install-recommends --no-remove \
+  docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+sudo systemctl start docker
+sudo docker version
+sudo docker buildx version
+sudo docker compose version
+```
+
+## Build both runtime images sequentially on the Acer
+
+Use the same staged revision. The Compose build uses the shared Noble builder stage, one compile job, and CTest inside the build. Sample memory, swap and free disk while each build runs. Stop before the next job if memory or storage falls below the initial floors or swap activity persists. Check both Docker storage filesystems before starting. No guest is needed for this gate.
+
+```bash
+set -euo pipefail
+: "${IMAGE_REVISION:?set the staged Git SHA}"
+cd "$HOME/mediadock/releases/$IMAGE_REVISION"
+test "$(cat .source-revision)" = "$IMAGE_REVISION"
+evidence=$(mktemp -d "$PWD/build-image-evidence.XXXXXX")
+docker_root=$(sudo docker info --format '{{.DockerRootDir}}')
+docker_mount=$(sudo df --output=target "$docker_root" | sed -n '2p')
+containerd_mount=$(sudo df --output=target /var/lib/containerd | sed -n '2p')
+: "${docker_mount:?missing Docker storage filesystem}" "${containerd_mount:?missing containerd storage filesystem}"
+sample_resources() {
+  date -Is
+  free -h
+  df -hP "$PWD" "$docker_mount" "$containerd_mount"
+  vmstat 1 2
+}
+check_headroom() {
+  awk '/^MemAvailable:/ {exit !($2 >= 1048576)}' /proc/meminfo
+  df -Pk "$PWD" "$docker_mount" "$containerd_mount" | awk 'NR > 1 && $4 < 12582912 {bad=1} END {exit bad}'
+}
+(while :; do sample_resources; sleep 10; done) > "$evidence/docker-resources.log" &
+monitor_pid=$!
+trap 'kill "$monitor_pid" 2>/dev/null || true' EXIT
+
+sudo env IMAGE_REVISION="$IMAGE_REVISION" docker compose -f infra/build.compose.yml config --quiet
+for role in producer consumer; do
+  check_headroom
+  sudo env IMAGE_REVISION="$IMAGE_REVISION" docker compose --parallel 1 --progress plain \
+    -f infra/build.compose.yml build "$role" 2>&1 | tee "$evidence/$role-build.log"
+  image="mediadock/$role:$IMAGE_REVISION"
+  identity=$(sudo docker image inspect \
+    --format '{{.Os}}/{{.Architecture}} {{index .Config.Labels "org.opencontainers.image.revision"}}' "$image")
+  test "$identity" = "linux/amd64 $IMAGE_REVISION"
+  sudo docker image inspect --format '{{.Id}} {{.Size}}' "$image"
+done
+sudo docker system df
+printf 'Docker evidence: %s\n' "$evidence"
+```
+
+Record the full native matrix, both builds, image IDs, peak memory/swap, and remaining free space before releasing Wave 2. Review [VM setup](VM_SETUP.md) separately before creating either guest.

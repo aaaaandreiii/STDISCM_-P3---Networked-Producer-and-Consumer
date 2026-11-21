@@ -7,7 +7,7 @@
 | `mediadock-producer`, Ubuntu Server 24.04 amd64 | Guest Docker Engine, one-shot producer and fixture generation | 2 vCPU, 1536 MiB RAM, sparse 12 GiB QCOW2 |
 | `mediadock-consumer`, Ubuntu Server 24.04 amd64 | Independent guest Docker Engine, gallery and gRPC | 2 vCPU, 2560 MiB RAM, sparse 18 GiB QCOW2 |
 
-Mac-to-Acer SSH timed out during preflight. The owner reported the Acer hardware inventory and that Docker is absent. VM provisioning, full-image builds, container health and the cross-VM rollout are **NOT RUN**. Complete the full Ubuntu build and runtime checks before treating a revision as deployable.
+The owner verified direct TCP connectivity and an interactive Mac-to-Acer SSH login. Codex reached SSH with network permission and is awaiting noninteractive authentication. Start with the [Acer native and Docker build gate](UBUNTU_BUILD_GATE.md). VM provisioning, full-image builds, container health and the cross-VM rollout remain pending.
 
 ## Before approval
 
