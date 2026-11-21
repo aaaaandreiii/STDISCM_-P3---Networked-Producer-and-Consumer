@@ -1,0 +1,13 @@
+**
+!CMakeLists.txt
+!docker/
+!docker/Dockerfile
+!src/
+!src/**
+!proto/
+!proto/**
+!tests/
+!tests/**
+tests/e2e/
+!web/
+!web/**

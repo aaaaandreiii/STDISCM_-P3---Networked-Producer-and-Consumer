@@ -1,0 +1,20 @@
+name: mediadock-build
+
+x-build: &build
+  context: ..
+  dockerfile: docker/Dockerfile
+  args:
+    IMAGE_REVISION: "${IMAGE_REVISION:?set the full source Git commit SHA}"
+
+services:
+  producer:
+    image: "mediadock/producer:${IMAGE_REVISION:?set the full source Git commit SHA}"
+    build:
+      <<: *build
+      target: producer
+
+  consumer:
+    image: "mediadock/consumer:${IMAGE_REVISION:?set the full source Git commit SHA}"
+    build:
+      <<: *build
+      target: consumer
