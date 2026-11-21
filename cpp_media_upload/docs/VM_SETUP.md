@@ -7,42 +7,52 @@
 | `mediadock-producer`, Ubuntu Server 24.04 amd64 | Guest Docker Engine, one-shot producer and fixture generation | 2 vCPU, 1536 MiB RAM, sparse 12 GiB QCOW2 |
 | `mediadock-consumer`, Ubuntu Server 24.04 amd64 | Independent guest Docker Engine, gallery and gRPC | 2 vCPU, 2560 MiB RAM, sparse 18 GiB QCOW2 |
 
-The owner verified direct TCP connectivity and an interactive Mac-to-Acer SSH login. Codex reached SSH with network permission. The dedicated Mac identity is pending. Start with the [Acer native and Docker build gate](UBUNTU_BUILD_GATE.md). VM provisioning, full-image builds, container health and the cross-VM rollout remain pending.
+The Acer passed dedicated-key BatchMode SSH, the native build, and the existing-Docker image gate. The Approval 3 preflight verified AMD-V, read/write access to `/dev/kvm`, and KVM API version 12. Provisioning and the cross-VM rollout are pending.
 
-## Before approval
+## Approval 3 preflight
 
-From the Mac, set `UBUNTU_LAPTOP_SSH` to the owner's existing SSH destination. Verify host-key trust using the owner's known fingerprint. Run the following read-only audit from a reachable connection.
+The Acer had 5.3 GiB available RAM, 4 GiB swap with zero use, and about 48 GiB free on the Ubuntu ext4 filesystem. The two guests reserve 4 GiB RAM total. First boot and package initialization should run one guest at a time, checking headroom before starting the second. The two sparse disks have a combined 30 GiB virtual size. Check actual allocated space and preserve at least 15 GiB free on the Acer before additional growth.
 
-```bash
-ssh -o BatchMode=yes -o ConnectTimeout=5 "$UBUNTU_LAPTOP_SSH" 'bash -s' <<'AUDIT'
-uname -m
-cat /etc/os-release
-lscpu | grep -E 'Model name:|CPU\(s\):|Virtualization:'
-test -c /dev/kvm && ls -l /dev/kvm
-free -h
-findmnt -T /var/lib
-df -h /var/lib
-ip -4 route
-ss -ltn
-for tool in virsh docker; do command -v "$tool" || true; done
-AUDIT
-```
+The Acer LAN and Docker bridge prefixes are distinct. The host already forwards IPv4 and TCP 8080 belongs to an existing service. Confirm all Docker network IPAM ranges and use a separate private subnet for the two guests. Forward the Mac's GUI port to the consumer guest. The Mac preflight found no listener at 8080 or 8081. Guest reservations and identities must be reviewed before defining a network or creating either domain.
 
-Review the commands below before the first setup. These are one-time operator operations. Before provisioning, verify a separate approved administrative access path for each guest and review the narrowly scoped lifecycle permissions in the [demo specification](07_ONE_COMMAND_DEMO_SPEC.md). Approval covers the listed APT package and repository changes, any optional operator Docker/libvirt group grants, the dedicated libvirt NAT network and its firewall rules, the base image and two guest disks, guest creation, owner public-key authorization in cloud-init, and Mac SSH host aliases and host-key trust. The host directory `/var/lib/libvirt/images/mediadock` and Docker's data directories must be on the Ubuntu filesystem. Leave partition tables, Windows volumes and data, existing host SSH policy and unrelated networks alone. Local app image builds and VM starts begin after the one-time privileged setup.
+## Guarded host package proposal
 
-## One-time Acer virtualization setup
+The default `libvirt-daemon-system` simulation proposed systemd, udev and libxml2 upgrades. Matching the new `systemd-container` to the installed systemd and retaining the installed libxml2 produced a valid simulation with 59 new packages, zero upgrades and zero removals. The stock bundle also includes `libvirt-daemon-config-network`. Review of that Ubuntu package's post-install script confirmed that it can automatically enable the default NAT network. Prefer the modular package set below so a deliberate MediaDock-only network can be reviewed separately. [Ubuntu package metadata](https://packages.ubuntu.com/source/resolute/libvirt) · [Libvirt daemons](https://libvirt.org/daemons.html)
 
-Run this section on the Acer after approval. Reconnect after the libvirt group change.
+The Acer stopped responding to SSH before this modular package set could be simulated against its current indexes. Run the simulation first once connectivity returns. The two `sudo` validation commands follow installation. Any package upgrades, removals or default-network package in the proposal stop the script. The install command is for review and remains pending explicit approval of its exact scope.
 
 ```bash
-sudo apt-get update
-sudo apt-get install qemu-kvm qemu-utils libvirt-daemon-system libvirt-clients virt-install curl ca-certificates
-sudo adduser "$USER" libvirt
-sudo -v
+set -euo pipefail
+export LC_ALL=C
+. /etc/os-release
+test "${VERSION_CODENAME:-}" = resolute
+test "$(dpkg --print-architecture)" = amd64
+packages=(
+  qemu-system-x86 qemu-utils libvirt-clients virt-install xorriso
+  libvirt-daemon-driver-qemu libvirt-daemon-driver-network
+  libvirt-daemon-driver-storage libvirt-daemon-lock
+  "systemd-container=$(dpkg-query -W -f='${Version}' systemd)"
+  "libxml2-16=$(dpkg-query -W -f='${Version}' libxml2-16)"
+)
+proposal=$(apt-get --simulate install --no-install-recommends --no-remove "${packages[@]}")
+printf '%s\n' "$proposal"
+grep -Eq '^0 upgraded, [0-9]+ newly installed, 0 to remove' <<< "$proposal"
+if grep -Eq '^Inst (libvirt-daemon-config-network|libvirt-daemon-system)([[:space:]:-]|$)' <<< "$proposal"; then
+  printf '%s\n' 'Unexpected default-network or system bundle package in APT proposal.' >&2
+  exit 1
+fi
+sudo apt-get install --no-install-recommends --no-remove "${packages[@]}"
 sudo virt-host-validate qemu
+sudo virsh --readonly -c qemu:///system net-list --all
 ```
 
-Check `virsh -c qemu:///system net-list --all`, `virsh -c qemu:///system list --all`, and the Acer's routing table. Select an unused RFC 1918 /24 and three distinct IPv4 addresses in it. Keep this subnet clear of the Acer LAN, VPN and existing libvirt/Docker networks, including the Docker guest bridge pool. Set the following local shell variables to approved values.
+The host package step does not grant broad libvirt or Docker group membership. System libvirt operations for provisioning use the owner’s interactive sudo while the scoped lifecycle access is reviewed separately. Retain the existing Acer Docker installation.
+
+## Guest network and creation review
+
+Review the guest command templates below after verifying the daemon and existing network inventory. Select the approved guest SSH identity and operator administration path before first boot. Reserve host storage only on the current Ubuntu filesystem. These templates require the reviewed live values and exact authorization before applying any host network, VM, guest Docker or SSH changes.
+
+Check `sudo virsh -c qemu:///system net-list --all`, `sudo virsh -c qemu:///system list --all`, and the Acer's routing table. Select an unused RFC 1918 /24 and three distinct IPv4 addresses in it. Keep this subnet clear of the Acer LAN, VPN and existing libvirt/Docker networks, including the Docker guest bridge pool. Set the following local shell variables to approved values.
 
 | Variable | Value |
 | --- | --- |
@@ -83,9 +93,9 @@ cd "$setup_dir"
 producer_mac=52:54:00:6d:64:01
 consumer_mac=52:54:00:6d:64:02
 test ! -e /var/lib/libvirt/images/mediadock
-! virsh -c qemu:///system net-info mediadock >/dev/null 2>&1 || exit 1
+! sudo virsh -c qemu:///system net-info mediadock >/dev/null 2>&1 || exit 1
 for domain in mediadock-producer mediadock-consumer; do
-  ! virsh -c qemu:///system dominfo "$domain" >/dev/null 2>&1 || exit 1
+  ! sudo virsh -c qemu:///system dominfo "$domain" >/dev/null 2>&1 || exit 1
 done
 
 cat > network.xml <<NETWORK
@@ -100,9 +110,9 @@ cat > network.xml <<NETWORK
   </ip>
 </network>
 NETWORK
-virsh -c qemu:///system net-define network.xml
-virsh -c qemu:///system net-start mediadock
-virsh -c qemu:///system net-autostart mediadock
+sudo virsh -c qemu:///system net-define network.xml
+sudo virsh -c qemu:///system net-start mediadock
+sudo virsh -c qemu:///system net-autostart mediadock
 ```
 
 Download one Canonical cloud image and verify its checksum against the official checksum file. Both sparse guest overlays use that base read-only. Record the image checksum and retain the base at its initial path for the lifetime of the guest disks. [Canonical cloud-image launch guide](https://ubuntu.com/docs/public-images/public-images-how-to/launch-with-libvirt/)
@@ -138,7 +148,7 @@ for role in producer consumer; do
 
   sudo qemu-img create -f qcow2 -F qcow2 -b "$vm_dir/noble-base.qcow2" \
     "$vm_dir/$domain.qcow2" "$disk_size"
-  virt-install --connect qemu:///system --virt-type kvm --cpu host-passthrough \
+  sudo virt-install --connect qemu:///system --virt-type kvm --cpu host-passthrough \
     --name "$domain" --memory "$memory" --vcpus 2 --import --osinfo generic \
     --disk "path=$vm_dir/$domain.qcow2,bus=virtio,format=qcow2" \
     --network "network=mediadock,model=virtio,mac=$mac" \
@@ -146,11 +156,11 @@ for role in producer consumer; do
     --noautoconsole
 done
 
-virsh -c qemu:///system net-dhcp-leases mediadock
-virsh -c qemu:///system list --all
+sudo virsh -c qemu:///system net-dhcp-leases mediadock
+sudo virsh -c qemu:///system list --all
 ```
 
-The cloud-init account is for orchestration. Use the separately approved guest administration path for package setup. Confirm the two reserved addresses and verify guest SSH host-key fingerprints on first boot using the trusted libvirt console. After deployment acceptance, the owner can enable domain autostart with `virsh -c qemu:///system autostart mediadock-producer` and `virsh -c qemu:///system autostart mediadock-consumer` for laptop restarts.
+The cloud-init account is for orchestration. Use the separately approved guest administration path for package setup. Confirm the two reserved addresses and verify guest SSH host-key fingerprints on first boot using the trusted libvirt console. After deployment acceptance, the owner can enable domain autostart with `sudo virsh -c qemu:///system autostart mediadock-producer` and `sudo virsh -c qemu:///system autostart mediadock-consumer` for laptop restarts.
 
 ## Mac SSH and guest identity
 
@@ -187,9 +197,9 @@ for guest in "$PRODUCER_SSH" "$CONSUMER_SSH"; do
 done
 ```
 
-## One-time Docker setup on the Acer and both guests
+## One-time Docker setup inside the two guests
 
-Use the signed Docker APT repository on each Ubuntu system. Docker supports both Ubuntu 26.04 and 24.04 on amd64. Review any pre-existing Docker/containerd packages first. Resolve package conflicts through separate approval before continuing. The Docker group is root-equivalent. These one-time commands are for the provisioning operator. Any operator group grant requires explicit approval. Provide the normal MediaDock commands with scoped access to owned services and fixed domain identities, keeping admin group access separate from the lifecycle identity. [Docker installation and supported Ubuntu releases](https://docs.docker.com/engine/install/ubuntu/) · [Docker group privileges](https://docs.docker.com/engine/install/linux-postinstall/#manage-docker-as-a-non-root-user)
+Use the signed Docker APT repository in each Ubuntu 24.04 amd64 guest. The Acer already has its host Docker installation. Review any pre-existing Docker/containerd packages first. Resolve package conflicts through separate approval before continuing. The Docker group is root-equivalent. These one-time commands are for the provisioning operator. Any operator group grant requires explicit approval. Provide the normal MediaDock commands with scoped access to owned services and fixed domain identities, keeping admin group access separate from the lifecycle identity. [Docker installation and supported Ubuntu releases](https://docs.docker.com/engine/install/ubuntu/) · [Docker group privileges](https://docs.docker.com/engine/install/linux-postinstall/#manage-docker-as-a-non-root-user)
 
 ```bash
 sudo apt-get update
@@ -200,7 +210,7 @@ sudo chmod a+r /etc/apt/keyrings/docker.asc
 
 . /etc/os-release
 case "$VERSION_CODENAME" in
-  noble|resolute) ;;
+  noble) ;;
   *) printf 'Unexpected Ubuntu suite\n' >&2; exit 1 ;;
 esac
 test "$(dpkg --print-architecture)" = amd64 || exit 1

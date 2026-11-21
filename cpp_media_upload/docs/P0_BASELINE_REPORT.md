@@ -205,3 +205,11 @@ python3 tests/e2e/http-acceptance.py build evidence/http "$http_port" "$grpc_por
 ```
 
 The resumed wrapper recorded gate exit 0. The Acer finished with 5.3 GiB available RAM, zero swap use and about 48 GiB free space. Docker and containerd remained active, and the same database process was still present. Selected combined logs are in `.demo-evidence/wave2-042e8a6/`. The P4 reproduction steps are in `tests/e2e/browser-README.md`. The Wave 2 commits and this report are on local `codex/integration`.
+
+### Approval 3 preflight and provisioning package review
+
+The user approved proceeding with Approval 3. The Acer SSH inventory confirmed Ubuntu 26.04.1 amd64, six logical CPUs, AMD-V, loaded KVM modules, read/write device access and KVM API version 12. The host had 5.3 GiB available RAM, zero swap use and about 48 GiB free on the Ubuntu ext4 filesystem. Docker and containerd were active. The host's TCP 8080 was already in use and the active LAN and Docker bridge prefixes must be excluded from the guest subnet.
+
+The read-only stock libvirt package simulation would upgrade 11 packages, including systemd and udev. Pinning the new systemd-container to the installed systemd version and retaining the installed libxml2 reduced that simulation to 59 new packages with zero changes to installed packages. The stock bundle would still install Ubuntu's default-network configuration package. Its official post-install script can enable a default NAT network. A smaller [host package proposal](VM_SETUP.md#guarded-host-package-proposal) now checks the exact transaction and rejects that package before installation.
+
+The Acer stopped answering SSH during the narrower package simulation and one retry timed out on port 22. APT, VM creation, host or guest network changes, and guest Docker installation remain NOT RUN. Exact scope confirmation and renewed connectivity are required before applying host changes.
