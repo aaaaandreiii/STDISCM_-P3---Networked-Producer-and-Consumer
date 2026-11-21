@@ -11,11 +11,11 @@ The local `codex/integration`, `codex/agent-a`, and `codex/agent-b` worktrees us
 | Implementation authorization | Approved |
 | Source verification, scope and contracts | Verified against the tracked tree and frozen in [architecture and invariants](03_ARCHITECTURE_AND_INVARIANTS.md) |
 | Mac GUI ports | Both loopback binds succeeded on 8080 and 8081 |
-| Ubuntu SSH inventory | NOT RUN. The owner reports the laptop is off. SSH exited 255 locally with `Operation not permitted` in the sandbox. |
-| Two guest capacity and port reachability | Pending the physical host audit. Consumer guest port, Mac tunnel and cross-guest tests need actual guests. See the [read-only audit command](10_MAC_UBUNTU_HOST_TOPOLOGY.md#p0-read-only-resource-audit). |
-| Wave 1 release | Held at P0 pending the physical host audit and topology decision |
+| Ubuntu inventory | Owner reported a successful preflight and provided measurements. Codex SSH timed out twice on TCP 22 after the laptop came back online. The Mac routes to the address via its default gateway. The direct KVM API, package candidate and permissions checks are NOT RUN. |
+| Two guest capacity and port reachability | Inventory supports development for the provisional 4 GiB guest RAM and 30 GiB sparse disk budget. Peak resource usage and guest/tunnel tests are pending. See the [topology and audit](10_MAC_UBUNTU_HOST_TOPOLOGY.md). |
+| Wave 1 release | A P1 and B P3 released in separate worktrees from `1027236` by the owner. Provisioning and integration acceptance are separate gates. |
 
-No credential or physical host login address is stored in this report. The physical Ubuntu laptop will be the hypervisor and SSH jump host if capacity checks pass. Proposed guests are Ubuntu 24.04 producer and consumer, each with its own Docker daemon. No privileged host or guest changes were executed.
+No credential or physical host login address is stored in this report. The Acer Ubuntu laptop is the planned build host, KVM hypervisor and SSH jump host. Proposed guests are Ubuntu 24.04 producer and consumer, each with its own Docker daemon. No privileged host or guest changes were executed.
 
 ## Wave 1 ownership and exit evidence
 
@@ -57,7 +57,7 @@ Commands below use the repository root unless stated otherwise. The Mac reported
   ```
 
 - `cmake --version`, `ninja --version`, and `ctest --version` each exited 127 on this Mac. `c++ -std=c++20 -fsyntax-only -I cpp_media_upload/src cpp_media_upload/src/consumer/app.cpp` exited 1 because the Mac standard library does not supply `std::osyncstream` in this environment. The full build, pipeline smoke CTest, Release CTest, Docker images and two-VM integration are NOT RUN. P1 must fix the existing test assertions that currently perform essential queue and DB mutations under `assert`.
-- Ubuntu 24.04 package listings show CMake 3.28, the gRPC C++ development package and gRPC protoc plugin, and Drogon 1.8.7 on amd64 and arm64. Their presence establishes packaging candidates. P1/P3 must test the imported CMake targets, generated include paths and HTTP API compatibility in the actual builder. [CMake package](https://packages.ubuntu.com/search?keywords=cmake&lang=en&suite=noble) · [Ubuntu gRPC packages](https://packages.ubuntu.com/en/source/noble/grpc) · [Drogon package](https://packages.ubuntu.com/libdrogon-dev)
+- Ubuntu 24.04 package listings show CMake 3.28, the gRPC C++ development package and gRPC protoc plugin, and Drogon 1.8.7 on amd64 and arm64. Their presence establishes packaging candidates. P1/P3 must test the imported CMake targets, generated include paths and HTTP API compatibility in the actual builder. Wave 1 source inspection found that the prescribed Drogon 1.8.7 header lacks `HttpResponse::setAllowCompression`, currently called in `http.cpp`. Resolve through HTTP ownership at the integration gate and verify Range 206/416. [Drogon 1.8.7 header](https://github.com/drogonframework/drogon/blob/v1.8.7/lib/inc/drogon/HttpResponse.h) [CMake package](https://packages.ubuntu.com/search?keywords=cmake&lang=en&suite=noble) · [Ubuntu gRPC packages](https://packages.ubuntu.com/en/source/noble/grpc) · [Drogon package](https://packages.ubuntu.com/libdrogon-dev)
 
 From the app directory on the prepared Ubuntu environment, P1 runs:
 

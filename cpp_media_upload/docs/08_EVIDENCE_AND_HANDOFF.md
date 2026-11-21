@@ -18,7 +18,7 @@ No actual test report is supplied by this planning document. Original tests were
 ## Master merge gate after Wave 1
 
 1. Review P1 CMake diff; ensure no silent disablement of tests in Release.
-2. Review P3 pinned Docker base/dependency list and *rebuild both images from the merged source*. P3 may need an update to reflect P1 build fixes.
+2. Review P3 pinned Docker base/dependency list and rebuild both images from the merged source on the Ubuntu build host. Run an exclusive build session with guest workloads idle and CMake/Ninja parallelism one initially.
 3. Compile and execute all targets in Ubuntu container; document compiler, gRPC/Drogon versions, build commands and result.
 4. Confirm VM1 and VM2 Compose files each refer to their own remote daemon, not one host.
 5. Confirm environment examples contain no secrets.

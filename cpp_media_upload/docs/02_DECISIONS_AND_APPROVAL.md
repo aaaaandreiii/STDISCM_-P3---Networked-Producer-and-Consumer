@@ -6,27 +6,23 @@
 
 | Topic | Recorded decision |
 |---|---|
-| Primary computer | **macOS, base-model MacBook Air with Apple M4** (Apple Silicon/arm64); no exact RAM or free disk yet measured |
-| Existing Linux hardware | **Spare laptop running Ubuntu**, reachable from the Mac via SSH |
+| Primary computer | **MacBook Air M4** for Codex, Git, SSH and browser. About 5 GB free per owner; no local Docker images or VMs. |
+| Existing Linux hardware | **Acer Swift SF314-42**, Ryzen 5 4500U, Ubuntu 26.04.1 LTS x86_64. Designated build host, KVM hypervisor and jump host. |
 | Existing virtual machines | **None yet** |
 | Containers inside separate VMs | **Explicitly acceptable** under instructor requirements |
 | Assignment interpretation | Producer and consumer must run on **two different actual Ubuntu VMs**. Docker containers on one host are not by themselves two VMs |
 | Plan approval | **YES.** Source/tests/Docker/demo runner implementation phases authorized |
 | Slides, narrated script, video recording | **Deferred in `TODO.md` only**; do not implement |
 | Demo shell script | **IN scope**, to be written/tested in P5, not included in planning artifact |
-| Credentials/guest addresses | **Not provided.** Never invent SSH usernames, credentials or IPs |
+| Credentials/guest addresses | Physical host SSH destination supplied separately. Guest users and addresses are resolved during provisioning. |
 
-## Approved proposed architecture — subject to P0 resource feasibility
+## Approved hardware-specific architecture
 
-**Preferred:** Apple M4 MacBook Air is the **Codex/controller/browser host**, not a build guest. The spare Ubuntu laptop is the **KVM/libvirt hypervisor** hosting two distinct Ubuntu 24.04 LTS virtual machines: `mediadock-producer` and `mediadock-consumer`. Run separate Docker engines and Compose projects inside each. VM→VM gRPC goes over a private guest network; the Mac reaches guests using SSH via the Ubuntu laptop (`ProxyJump` or a tested equivalent). GUI exposed to macOS using **a managed localhost SSH tunnel** or a proven private LAN route. This keeps C++ images on the same guest architecture and avoids consuming Mac RAM with VMs if the Ubuntu laptop can support them.
+The Acer will host two Ubuntu Server 24.04 amd64 KVM guests with separate Docker daemons. The producer starts with 2 vCPUs, 1.5 GiB RAM and a 12 GiB sparse QCOW2 disk. The consumer starts with 2 vCPUs, 2.5 GiB RAM and an 18 GiB sparse QCOW2 disk. Rehearsal will validate those provisional budgets.
 
-**Resource gate:** P0 remotely checks virtualization availability (`/dev/kvm`, CPU support), `free -h`, `df -h`, `uname -m`, operating system, SSH stability and available network ports. Proposed budgets (not promises): ~4–6 GiB RAM and 20–30 GiB disk per VM depending on build strategy; Ubuntu host needs headroom. Agent B must design a lower-memory serial-build path when resources are tight. Do not install or create guests on an undersized host by assumption.
+Build images on the physical Ubuntu host, one heavy job at a time with the guests quiesced, and install revision-tagged runtime images into the guests. Run memory-intensive demo scenarios sequentially. Preserve space on the Ubuntu filesystem and all Windows partitions and existing data.
 
-**Fallbacks, ordered by compatibility:**
-
-1. One Ubuntu arm64 guest on the Mac using an Apple Silicon-compatible VM system, plus one Ubuntu VM on the Ubuntu laptop if KVM works but available RAM cannot support two guests. Build each image for its native architecture; configure private VM-to-VM connectivity and SSH through tested routes/tunnels.
-2. Two Ubuntu arm64 guests on the Mac, if Mac RAM/storage reasonably allow it; spare laptop is not used for runtime. Validate network and Docker memory before selecting.
-3. If no feasible two-VM configuration exists, **STOP the deployment gate and report** needed resources to user. Do **not** call a single VM, a physical Ubuntu host, Docker Desktop's embedded VM, or two containers on one Docker daemon sufficient without instructor-specific written approval.
+Wave 1 development is approved based on the owner's inventory. Direct SSH, the KVM API/device permissions, real package candidates, guest networking and measured peak resource use remain deployment gates. If the Acer's build phase alone fails the resource gate, use a separate amd64 builder. If it cannot run both guests safely, use an additional or larger KVM host with the same two-guest requirement. The Mac stays the controller in either case.
 
 ## One-time system change authorization
 
@@ -45,9 +41,10 @@ The user's plan approval authorizes **writing** provisioning instructions, optio
 
 ## P0 observations to fill in (not approvals to repeat)
 
-- [ ] Ubuntu laptop CPU architecture, RAM and free disk measured; virtualization support verified.
-- [ ] Mac free RAM/disk measured only if fallback is necessary.
-- [ ] Hypervisor host SSH alias selected; VM SSH aliases, LAN/private addresses and SSH key trust configured.
+- [x] Owner reported CPU, RAM, swap, free disk, AMD-V, and `/dev/kvm` on the Ubuntu laptop. Hardware-conditional Wave 1 development released.
+- [x] Mac storage checked. The Mac is reserved for editing, orchestration and the browser.
+- [ ] Verify SSH reachability from Codex and query KVM API, device permissions and apt candidates.
+- [ ] Configure and validate guest SSH aliases, private addresses and SSH key trust during approved provisioning.
 - [ ] Two distinct guest VM identities verified (`machine-id`, hostname, hypervisor domain/instance), distinct Docker daemons and source revision.
 - [ ] Privileged setup tasks reviewed/authorized by user before execution.
 - [ ] Reachability: producer VM -> consumer VM gRPC, Mac -> consumer GUI via managed local tunnel/route.

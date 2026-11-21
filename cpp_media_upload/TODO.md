@@ -6,8 +6,8 @@
 
 - [x] User approved phased implementation and two-VM Docker deployment on 2026-11-21 (see `docs/02_DECISIONS_AND_APPROVAL.md`).
 - [x] Host identified: macOS base-model M4 MacBook Air; Ubuntu spare laptop already SSH-reachable; no Ubuntu VMs yet.
-- [ ] P0: inventory spare Ubuntu laptop virtualization CPU, RAM/disk, KVM support; decide guests (preferred two libvirt Ubuntu VMs on laptop).
-- [ ] P0: if KVM/resources insufficient, choose compliant Mac+Ubuntu or Mac-only two-guest fallback with user; confirm guest network routes.
+- [x] P0 development gate: record owner-verified Acer inventory and approve two resource-limited Ubuntu Server 24.04 guests.
+- [ ] Before deployment: verify SSH from Codex, KVM API and device permissions, configured apt candidates and safe resource limits. Use [a separate amd64 builder or KVM host](docs/10_MAC_UBUNTU_HOST_TOPOLOGY.md#fallback-if-the-acer-reaches-its-limits) if needed.
 - [x] Confirmed two separate Ubuntu VMs with Docker containers inside each are acceptable. Single-host Docker mode is test-only.
 - [ ] P0: verify ports 50051/8080/50052/8081, test media acceptance; confirm exact privileged host/VM installation steps before executing them (plan approved, unattended sudo not automatically approved).
 - [ ] P0/P3: establish guest SSH identities, private VM network, Mac-to-guest jump host access, Mac GUI localhost SSH tunnel.
@@ -17,7 +17,7 @@
 
 ## Codex implementation phases
 
-- [ ] **P0** Source audit and contract freeze recorded. The Ubuntu hardware preflight and topology decision are pending. See [P0 baseline report](docs/P0_BASELINE_REPORT.md).
+- [x] **P0 development gate** Source, worktrees, reviewed inventory and contracts recorded. Wave 1 released. Remaining host and deployment checks are tracked above. See [P0 baseline report](docs/P0_BASELINE_REPORT.md).
 - [ ] **P1** Fix test side effects, assert-vs-Release behavior, full build/dependency reliability — Agent A.
 - [ ] **P2** gRPC concurrency/producer/consumer correctness and real integration tests — Agent A.
 - [ ] **P3** Docker images, Compose stacks, persistent volumes and two-VM network documentation — Agent B.
@@ -51,7 +51,7 @@
 
 ## Hold points
 
-1. No code until user approves P0/deployment defaults.
+1. Complete Wave 1 development as approved. Show exact one-time setup operations for explicit approval before deploying.
 2. After P1+P3, do not merge incompatible Docker/CMake assumptions without a compile test.
 3. After P2+P4, recheck API URLs and HTTP/Protobuf contracts.
 4. After P5+P6, run a **fresh** two-VM demo and a **rerun** preserving data before P7 sign-off.

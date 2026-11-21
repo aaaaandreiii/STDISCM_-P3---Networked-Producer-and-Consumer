@@ -68,9 +68,9 @@ HTTP endpoints: `/health`, `/`, `/style.css`, `/app.js`, `/api/videos`, `/api/vi
 
 - **Producer image:** multi-stage Docker C++ build; runtime includes libgrpc++, libprotobuf, libssl, SQLite as required by linked binaries, FFmpeg for synthetic fixture generation only if fixture sidecar is used. Producer scans a mounted run-specific root with `producer_1..producer_p`; default job may be exited/ephemeral after uploads (not always-on).
 - **Consumer image:** multi-stage Docker C++ build; runtime has FFmpeg/ffprobe, Drogon shared libraries, web assets, writable media volume; published gRPC and HTTP ports; health/readiness probes.
-- For simplicity, same pinned builder base may generate both images. Avoid fetching dependencies live at demo time: build once in preflight/rehearsal, reusing images on demo day.
+- The physical Ubuntu amd64 host builds both images from a shared pinned build stage, one compile job at a time. Reuse revision-tagged runtime images loaded into the guests during preparation. Keep compilation off the guests and Mac.
 - **Overload consumer:** same image, different Compose service/project, data volume, `c=1 q=2 --demo-delay-ms=2500`, ports 50052/8081. Isolated tests do not pollute normal gallery.
-- Use Docker Compose's stable service naming and `restart: unless-stopped` for consumers; **producer is a run-to-completion job**. `up -d` is for services; `run --rm` or `docker exec` for replays. Do not restart an already completed producer blindly and claim success.
+- Use Docker Compose's stable service naming and `restart: unless-stopped` for consumers. Sequence normal and overload heavy workloads on the same guest. The **producer is a run-to-completion job**. `up -d` is for services; `run --rm` or `docker exec` for replays. Do not restart an already completed producer blindly and claim success.
 
 ## Configuration and security boundary
 
