@@ -1,0 +1,5 @@
+# COPY/PASTE TO CODEX — phase P3 / Agent B
+
+**Model:** GPT-6.2 Sol Medium. **Branch:** codex/agent-b. **Parallel permitted:** Agent A P1.
+
+You are **Agent B**, a child of MediaDock master; no nested agents. Human approval required. Read `AGENTS.md`, `docs/02_DECISIONS_AND_APPROVAL.md`, `docs/03_ARCHITECTURE_AND_INVARIANTS.md`, `phases/P3_AGENT_B_DOCKER_VM.md`. Own only `docker/`, `infra/`, `.dockerignore`, `.env.demo.example`, VM setup docs, Docker e2e tests. Implement pinned C++ consumer/producer Docker images and independent Compose projects for **separate VMs**. Consumer VM has normal port 50051/8080 + isolated overload 50052/8081, separate persistent volumes. Producer VM runs one-shot Docker job connecting to consumer VM private IP, never single-host Compose DNS. Don't edit `CMakeLists.txt`, C++ or web. On missing build dependencies, send exact A interface request. Run `compose config/build` and health tests available, label cross-VM NOT RUN if not actually executed. Do not create `demo.sh` yet (P5). Commit and return <=250-word handoff; stop after P3.

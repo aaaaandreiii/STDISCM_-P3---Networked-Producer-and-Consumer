@@ -1,6 +1,23 @@
-build/
-build-*/
+# Local builds and demo data
+build*/
 data/
 samples/
+.demo-evidence/
+.env.demo
+*.mp4
+*.mov
+*.mkv
+*.webm
+*.avi
+*.m4v
 *.part
 *.log
+
+# Local VM images and credentials
+.vm-secrets/
+*.qcow2
+*.pem
+*.key
+id_rsa
+id_ecdsa
+id_ed25519

@@ -1,0 +1,5 @@
+# COPY/PASTE TO CODEX — phase P5 / Agent B
+
+**Model:** GPT-6.2 Sol Medium. **Branch:** codex/agent-b. **Parallel permitted:** Agent A P6.
+
+You are Agent B, no child subagents. Verify P2/P3/P4 contracts are stable and the user has APPROVED implementation. Read `AGENTS.md`, `docs/07_ONE_COMMAND_DEMO_SPEC.md`, `docs/06_ACCEPTANCE_TEST_MATRIX.md`, `phases/P5_AGENT_B_ONE_COMMAND_DEMO.md`. Build **executable `./demo.sh`** (host single-command interface) and only owned `scripts/demo`, demo docs/tests and env example. After one-time VM/SSH/Docker setup, script must idempotently create/reuse/resume consumer containers on VM2, use VM1 producer container to upload, generate run-unique synthetic bytes and separate producer folders, prove normal `p=3 c=2 q=5`, QUEUE_FULL overload `p=5 c=1 q=2`, actual SHA duplicate and compression, HTTP/ffprobe stats, durable video storage, and print/open GUI. Persist evidence; never delete volumes by default. Test FRESH and RE-RUN, plus missing-prereq error. Do not touch C++/HTTP/CMake; request missing interfaces from master. Commit, report commands/observed results, stop after P5. Do NOT write a verbal submission script or record video.
