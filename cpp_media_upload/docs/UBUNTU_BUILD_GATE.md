@@ -1,6 +1,6 @@
 # Acer Ubuntu build gate
 
-Run the native gate on the Acer's Ubuntu 26.04 amd64 installation. Run the Noble container image builds on that same laptop after the native gate passes. The owner approved the exact native toolchain commands in Approval 1. The native gate passed. Approval 2 covers reuse of the Acer’s existing Docker installation for MediaDock image checks. Workspace setup, builds, and checks use one job at a time. VM provisioning has its own approval and follows the native gate.
+Run the native gate on the Acer's Ubuntu 26.04 amd64 installation. Run the Noble container image builds on that same laptop after the native gate passes. The owner approved the exact native toolchain commands in Approval 1. The native gate passed. The owner granted Approval 2 for the scoped image gate using the Acer’s existing Docker installation. Workspace setup, builds, and checks use one job at a time. VM provisioning has its own approval and follows the native gate.
 
 ## Verify the SSH login
 
@@ -113,7 +113,7 @@ printf 'Native evidence: %s\n' "$evidence"
 
 ## Approval 2 — build with the Acer’s existing Docker
 
-The Acer already reports Docker 29.10.0, Buildx 0.39.1 and Compose 5.8.0. Docker and containerd are active, and the build account lacks direct Docker socket access. Request explicit approval for the exact privileged commands in [the build and image checks below](#build-both-runtime-images-sequentially-on-the-acer), using the same staged source revision. The gate reuses the running daemon and does not need host package, repository, Docker group or daemon configuration changes. The build pulls and caches image layers and writes MediaDock-tagged images. The executable checks use transient containers with networking disabled, no published ports, and no mounted volumes.
+Approval 2 grants use of the existing Docker 29.10.0 daemon, Buildx 0.39.1 and Compose 5.8.0 for the two MediaDock images at `917a621`. The build account uses sudo through the owner's interactive authentication. The gate uses the local default Docker builder, reads shared-daemon metadata, and writes only MediaDock image tags and build cache. The two executable checks use transient containers with networking disabled, no published ports and no mounted volumes. A host package installation or daemon change is outside Approval 2.
 
 ### Fresh installation contingency
 
@@ -161,50 +161,15 @@ sudo docker compose version
 
 ## Build both runtime images sequentially on the Acer
 
-Use the same staged revision. The Compose build uses the shared Noble builder stage, one compile job, and CTest inside the build. Sample memory, swap and free disk while each build runs. Stop before the next job if memory or storage falls below the initial floors or swap activity persists. Check both Docker storage filesystems before starting. No guest is needed for this gate.
+The verified runner is staged at `.approval2/run-image-gate.sh` in the Acer release directory for `917a6218d499632fe3a3c6a836ab7ffaed9349cd`. Run this from the Mac with the Acer SSH destination configured. The operator authenticates to sudo in the terminal.
 
 ```bash
-set -euo pipefail
-: "${IMAGE_REVISION:?set the staged Git SHA}"
-cd "$HOME/mediadock/releases/$IMAGE_REVISION"
-test "$(cat .source-revision)" = "$IMAGE_REVISION"
-evidence=$(mktemp -d "$PWD/build-image-evidence.XXXXXX")
-sudo docker version
-sudo docker buildx version
-sudo docker compose version
-sudo docker buildx imagetools inspect ubuntu:noble-20261110.1
-docker_root=$(sudo docker info --format '{{.DockerRootDir}}')
-docker_mount=$(sudo df --output=target "$docker_root" | sed -n '2p')
-containerd_mount=$(sudo df --output=target /var/lib/containerd | sed -n '2p')
-: "${docker_mount:?missing Docker storage filesystem}" "${containerd_mount:?missing containerd storage filesystem}"
-sample_resources() {
-  date -Is
-  free -h
-  df -hP "$PWD" "$docker_mount" "$containerd_mount"
-  vmstat 1 2
-}
-check_headroom() {
-  awk '/^MemAvailable:/ {exit !($2 >= 1048576)}' /proc/meminfo
-  df -Pk "$PWD" "$docker_mount" "$containerd_mount" | awk 'NR > 1 && $4 < 12582912 {bad=1} END {exit bad}'
-}
-(while :; do sample_resources; sleep 10; done) > "$evidence/docker-resources.log" &
-monitor_pid=$!
-trap 'kill "$monitor_pid" 2>/dev/null || true' EXIT
-
-sudo env IMAGE_REVISION="$IMAGE_REVISION" docker compose -f infra/build.compose.yml config --quiet
-for role in producer consumer; do
-  check_headroom
-  sudo env IMAGE_REVISION="$IMAGE_REVISION" docker compose --parallel 1 --progress plain \
-    -f infra/build.compose.yml build "$role" 2>&1 | tee "$evidence/$role-build.log"
-  image="mediadock/$role:$IMAGE_REVISION"
-  identity=$(sudo docker image inspect \
-    --format '{{.Os}}/{{.Architecture}} {{index .Config.Labels "org.opencontainers.image.revision"}}' "$image")
-  test "$identity" = "linux/amd64 $IMAGE_REVISION"
-  sudo docker image inspect --format '{{.Id}} {{.Size}}' "$image"
-  sudo docker run --rm --network none "$image" --help 2>&1 | tee "$evidence/$role-help.log"
-done
-sudo docker system df
-printf 'Docker evidence: %s\n' "$evidence"
+: "${UBUNTU_LAPTOP_SSH:?set the verified Acer SSH destination}"
+ssh -tt -i "$HOME/.ssh/id_ed25519_mediadock" \
+  -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes "$UBUNTU_LAPTOP_SSH" \
+  'bash "$HOME/mediadock/releases/917a6218d499632fe3a3c6a836ab7ffaed9349cd/.approval2/run-image-gate.sh"'
 ```
 
-Record the full native matrix, both builds, image IDs, peak memory/swap, and remaining free space before releasing Wave 2. Review [VM setup](VM_SETUP.md) separately before creating either guest.
+The runner checks the staged source checksums, authenticated tool versions and local builder. It records running container IDs and their state, start time, restart count and health field when present. It also records memory, swap, disk and Docker storage before and after the builds. The minimum free space is 15 GiB. An 18 GiB cutoff leaves a buffer for writes in progress. During each serial build it samples available RAM, swap-in and swap-out, memory pressure and disk, and compares baseline container state. The gate cancels its own Compose build on sustained swapping, severe memory pressure, loss of disk headroom or a change in a baseline container. It also compares container state after the gate. Docker health metadata alone is insufficient for an application-level health claim.
+
+The evidence directory `build-image-evidence.<suffix>/` contains exact logged build commands and exits, image metadata, per-image help output, before/after container snapshots, resource samples and `gate.exit`. Review the actual evidence before releasing Wave 2. Actual guest provisioning remains behind [Approval 3](VM_SETUP.md).

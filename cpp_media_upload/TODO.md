@@ -10,7 +10,8 @@
 - [x] Owner approved the exact [Acer native toolchain commands](docs/UBUNTU_BUILD_GATE.md#approval-1--install-the-native-toolchain-on-the-acer).
 - [x] Verify the dedicated Codex SSH identity with BatchMode.
 - [x] Owner completed the native toolchain install. Acer Debug and Release builds and CTest passed over BatchMode SSH.
-- [ ] Obtain separate approvals for [existing Docker daemon use](docs/UBUNTU_BUILD_GATE.md#approval-2--build-with-the-acers-existing-docker) and [KVM/libvirt provisioning](docs/VM_SETUP.md).
+- [x] Owner granted scoped [existing Docker daemon use](docs/UBUNTU_BUILD_GATE.md#approval-2--build-with-the-acers-existing-docker) for the two MediaDock images at `917a621`.
+- [ ] Complete Approval 2 via interactive sudo, verify the actual image evidence, then release Wave 2. Obtain separate [KVM/libvirt provisioning approval](docs/VM_SETUP.md).
 - [ ] Before deployment: verify KVM API and device permissions, configured apt candidates and safe resource limits. Use [a separate amd64 builder or KVM host](docs/10_MAC_UBUNTU_HOST_TOPOLOGY.md#fallback-if-the-acer-reaches-its-limits) if needed.
 - [x] Confirmed two separate Ubuntu VMs with Docker containers inside each are acceptable. Single-host Docker mode is test-only.
 - [ ] P0: verify ports 50051/8080/50052/8081, test media acceptance; confirm exact privileged host/VM installation steps before executing them (plan approved, unattended sudo not automatically approved).

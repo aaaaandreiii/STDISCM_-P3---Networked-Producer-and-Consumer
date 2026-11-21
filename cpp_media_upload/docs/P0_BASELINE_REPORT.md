@@ -153,3 +153,9 @@ Both suites ran `media_core_tests` and `media_pipeline_smoke` with zero failures
 The six-core Acer had 5.3 GiB `MemAvailable` before and after the gate. The lowest observed sample was 4.9 GiB. Swap usage and swap-in/out stayed at zero. Free disk remained approximately 49 GiB; both build trees and logs occupied about 51 MiB. Docker and containerd were active before and after, and the same containerized database PID remained running. The build account could not query the Docker socket, so application-level health of the other project was not independently tested.
 
 Approval 2 now concerns [using the existing Docker daemon](UBUNTU_BUILD_GATE.md#approval-2--build-with-the-acers-existing-docker) for the serial Noble image gate. No Docker installation, image build or VM provisioning was performed. Wave 2 remains held at the image gate.
+
+### Approval 2 — image runner staged
+
+The owner authorized image builds and isolated executable checks for the two MediaDock targets at `917a621` using the existing daemon. SSH preflight confirmed Docker 29.10.0, Buildx 0.39.1, Compose 5.8.0, active Docker and containerd services, 5.3 GiB available memory, zero swap use and approximately 49 GiB free disk. `sudo -n -l /usr/bin/docker version` reported that interactive authentication is required.
+
+The runner and source manifest were staged in `.approval2/` in the verified Acer release. Local and remote Bash syntax checks passed, and the transferred runner matched SHA-256 `0ffa5d598872f2c23c334e759fb79fbec3c7280d132e27f165d457cca855d536`. The runner uses an 18 GiB cutoff to protect the 15 GiB reserve, monitors memory/swap and baseline container state, and runs only the fixed producer and consumer targets sequentially. The owner has the exact interactive command. Image builds, revision labels, isolated help runs and actual before/after container verification remain NOT RUN pending the interactive runner.
