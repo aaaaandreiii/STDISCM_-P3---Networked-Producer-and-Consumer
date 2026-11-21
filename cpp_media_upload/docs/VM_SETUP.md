@@ -19,7 +19,7 @@ The Acer LAN and Docker bridge prefixes are distinct. The host already forwards 
 
 The default `libvirt-daemon-system` simulation proposed systemd, udev and libxml2 upgrades. Matching the new `systemd-container` to the installed systemd and retaining the installed libxml2 produced a valid simulation with 59 new packages, zero upgrades and zero removals. The stock bundle also includes `libvirt-daemon-config-network`. Review of that Ubuntu package's post-install script confirmed that it can automatically enable the default NAT network. Prefer the modular package set below so a deliberate MediaDock-only network can be reviewed separately. [Ubuntu package metadata](https://packages.ubuntu.com/source/resolute/libvirt) · [Libvirt daemons](https://libvirt.org/daemons.html)
 
-The Acer stopped responding to SSH before this modular package set could be simulated against its current indexes. Run the simulation first once connectivity returns. The two `sudo` validation commands follow installation. Any package upgrades, removals or default-network package in the proposal stop the script. The install command is for review and remains pending explicit approval of its exact scope.
+SSH is reachable again. The exact modular proposal passed on the Acer with 53 new packages, zero upgrades or removals and no default-network package. The owner asked to implement the reviewed proposal. Sudo requires interactive authentication. The approved commands below are staged in `~/mediadock/approval3-host/install-host-tools.sh`; `run-host-tools.sh` records output and exit status. The runner simulates the transaction again before applying it and stops if upgrades, removals or the default-network package appear.
 
 ```bash
 set -euo pipefail

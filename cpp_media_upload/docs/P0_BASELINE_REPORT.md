@@ -213,3 +213,9 @@ The user approved proceeding with Approval 3. The Acer SSH inventory confirmed U
 The read-only stock libvirt package simulation would upgrade 11 packages, including systemd and udev. Pinning the new systemd-container to the installed systemd version and retaining the installed libxml2 reduced that simulation to 59 new packages with zero changes to installed packages. The stock bundle would still install Ubuntu's default-network configuration package. Its official post-install script can enable a default NAT network. A smaller [host package proposal](VM_SETUP.md#guarded-host-package-proposal) now checks the exact transaction and rejects that package before installation.
 
 The Acer stopped answering SSH during the narrower package simulation and one retry timed out on port 22. APT, VM creation, host or guest network changes, and guest Docker installation remain NOT RUN. Exact scope confirmation and renewed connectivity are required before applying host changes.
+
+### Approval 3 host tool staging
+
+On the requested retry, dedicated-key SSH succeeded and the exact modular APT simulation passed with 53 new packages, zero upgrades, zero removals and no default network or system bundle package. The Acer reported 5.8 GiB available RAM, zero swap use and 48 GiB free. Docker and containerd were active. A read-only SSH forwarding probe returned the Acer's own SSH banner through a TCP channel; guest forwarding still needs testing. The Acer received the official Canonical Noble cloud-image checksum manifest.
+
+Sudo requires interactive authentication. The reviewed install command and logging wrapper were staged under `~/mediadock/approval3-host`. Shell syntax and local/remote hashes matched. The host-tools runner had no completion marker at the end of the check. Host package installation and live libvirt checks are pending the operator's sudo session. No guest, host network or Docker configuration was changed.
