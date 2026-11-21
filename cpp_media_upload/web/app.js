@@ -94,7 +94,13 @@ async function refresh() {
   } catch (error) {
     document.getElementById('health').textContent = 'Consumer unavailable';
     document.getElementById('live-dot').classList.remove('live');
-    if (!videos.length) {gallery.replaceChildren(); const div=document.createElement('div');div.className='empty';div.textContent='Unable to load videos. Check consumer logs and network access.';gallery.append(div);}
+    if (!videos.length) {
+      lastSignature = '';
+      const empty = document.createElement('div');
+      empty.className = 'empty';
+      empty.textContent = 'Unable to load videos. Check consumer logs and network access.';
+      gallery.replaceChildren(empty);
+    }
     console.warn('Dashboard refresh failed', error);
   }
 }
