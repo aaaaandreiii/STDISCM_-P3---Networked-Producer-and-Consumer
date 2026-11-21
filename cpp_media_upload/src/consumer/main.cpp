@@ -3,6 +3,7 @@
 #include "consumer/http.hpp"
 #include <drogon/drogon.h>
 #include <grpcpp/grpcpp.h>
+#include <chrono>
 #include <csignal>
 #include <cstdlib>
 #include <exception>
@@ -88,7 +89,9 @@ int main(int argc, char** argv) {
       " c=" + std::to_string(config.consumers) + " q=" + std::to_string(config.queue_capacity) +
       " compression=" + (config.compress ? "on" : "off"));
     drogon::app().addListener(config.http_host, static_cast<uint16_t>(config.http_port)).setThreadNum(2).run();
-    server->Shutdown(); // wait for in-progress calls before stopping workers
+    // Give active RPCs time to finish before cancelling unfinished transfers.
+    // Keep workers running until all accepted jobs have drained.
+    server->Shutdown(std::chrono::system_clock::now() + std::chrono::seconds(5));
     app.stop_workers();
     media::log_line("main", "shutdown complete");
   } catch (const std::exception& e) {
