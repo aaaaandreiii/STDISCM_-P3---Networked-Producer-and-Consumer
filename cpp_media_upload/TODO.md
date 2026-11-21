@@ -8,7 +8,8 @@
 - [x] Host identified: macOS base-model M4 MacBook Air; Ubuntu spare laptop already SSH-reachable; no Ubuntu VMs yet.
 - [x] P0 development gate: record owner-verified Acer inventory and approve two resource-limited Ubuntu Server 24.04 guests.
 - [x] Owner approved the exact [Acer native toolchain commands](docs/UBUNTU_BUILD_GATE.md#approval-1--install-the-native-toolchain-on-the-acer).
-- [ ] Verify the dedicated Codex SSH identity with BatchMode. Obtain separate approvals for the [Docker install](docs/UBUNTU_BUILD_GATE.md#approval-2--install-docker-on-the-acer) and [KVM/libvirt provisioning](docs/VM_SETUP.md).
+- [x] Verify the dedicated Codex SSH identity with BatchMode.
+- [ ] Complete the native toolchain install through interactive sudo; continue the native gate via BatchMode SSH. Obtain separate approvals for any required [Docker install](docs/UBUNTU_BUILD_GATE.md#approval-2--install-docker-on-the-acer) and [KVM/libvirt provisioning](docs/VM_SETUP.md).
 - [ ] Before deployment: verify KVM API and device permissions, configured apt candidates and safe resource limits. Use [a separate amd64 builder or KVM host](docs/10_MAC_UBUNTU_HOST_TOPOLOGY.md#fallback-if-the-acer-reaches-its-limits) if needed.
 - [x] Confirmed two separate Ubuntu VMs with Docker containers inside each are acceptable. Single-host Docker mode is test-only.
 - [ ] P0: verify ports 50051/8080/50052/8081, test media acceptance; confirm exact privileged host/VM installation steps before executing them (plan approved, unattended sudo not automatically approved).

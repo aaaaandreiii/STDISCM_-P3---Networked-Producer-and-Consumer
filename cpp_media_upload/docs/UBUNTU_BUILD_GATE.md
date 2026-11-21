@@ -4,7 +4,7 @@ Run the native gate on the Acer's Ubuntu 26.04 amd64 installation. Run the Noble
 
 ## Verify the SSH login
 
-The owner confirmed an interactive login from the Mac. The Codex sandbox denied the first socket attempt. With network permission, Codex reached the SSH server, verified its existing host key and received `Permission denied (publickey,password)` in BatchMode. The Mac's agent reported zero loaded identities. The owner is setting up a dedicated identity. The latest sandbox-exempt check found the dedicated key absent and the SSH agent empty, so the key-based attempt is pending. The owner can use an authenticated interactive session to run Approval 1.
+The owner confirmed an interactive login from the Mac. The dedicated identity subsequently also passed strict-host-key BatchMode authentication through Codex. The Acer requires interactive sudo authentication for package work. The operator can run the exact approved native install in their authenticated terminal, then Codex can continue the unprivileged builds and tests. The release-specific installer records its apt output and exit code for evidence.
 
 From the Mac, use the verified Acer login destination. With the same known host key already recorded under the previous address, `HostKeyAlias` can preserve strict host-key verification. Once the dedicated public key is authorized on the Acer, run one bounded BatchMode check using the Mac identity. Check the authenticated username, hostname, release and architecture before using the Acer commands.
 
