@@ -29,7 +29,7 @@ COPY proto/ proto/
 COPY src/ src/
 COPY tests/ tests/
 
-# Debug keeps the baseline C++ test assertions active.
+# Run the build and tests serially to limit memory use on the Acer.
 RUN cmake -S . -B /build -G Ninja -DCMAKE_BUILD_TYPE=Debug \
         -DBUILD_FULL_APP=ON -DBUILD_TESTING=ON \
     && cmake --build /build --parallel 1 \

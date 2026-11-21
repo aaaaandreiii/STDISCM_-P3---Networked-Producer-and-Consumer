@@ -7,7 +7,7 @@
 | `mediadock-producer`, Ubuntu Server 24.04 amd64 | Guest Docker Engine, one-shot producer and fixture generation | 2 vCPU, 1536 MiB RAM, sparse 12 GiB QCOW2 |
 | `mediadock-consumer`, Ubuntu Server 24.04 amd64 | Independent guest Docker Engine, gallery and gRPC | 2 vCPU, 2560 MiB RAM, sparse 18 GiB QCOW2 |
 
-Mac-to-Acer SSH timed out during preflight. The owner reported the Acer hardware inventory and that Docker is absent. VM provisioning, full-image builds, container health and the cross-VM rollout are **NOT RUN**. Complete the Drogon compatibility fix and the full build before treating a revision as deployable.
+Mac-to-Acer SSH timed out during preflight. The owner reported the Acer hardware inventory and that Docker is absent. VM provisioning, full-image builds, container health and the cross-VM rollout are **NOT RUN**. Complete the full Ubuntu build and runtime checks before treating a revision as deployable.
 
 ## Before approval
 
@@ -377,6 +377,6 @@ Each consumer keeps its own `metadata.db`, `incoming/`, `uploads/` and `previews
 
 ## Linux build compatibility and P3 verification
 
-Noble's packaged Drogon is 1.8.7. The baseline `src/consumer/http.cpp` calls `HttpResponse::setAllowCompression`, absent from that version's public header. Integrate a source compatibility fix and verify HTTP byte ranges and compression behavior before rollout. [Drogon v1.8.7 response header](https://github.com/drogonframework/drogon/blob/v1.8.7/lib/inc/drogon/HttpResponse.h)
+Noble ships Drogon 1.8.7. The integration build removed the unsupported `HttpResponse::setAllowCompression` call. File responses already supply `CT_CUSTOM`, which Drogon excludes from automatic compression. Verify HTTP 206/416 and the absence of a compressed content encoding on ranged files during deployment acceptance. [Drogon 1.8.7 response implementation](https://github.com/drogonframework/drogon/blob/v1.8.7/lib/src/HttpResponseImpl.cc)
 
 P3 verified the resolved Compose configurations using `tests/e2e/docker-config.sh` on macOS arm64 with Docker Compose 5.2.0. The config checks exited 0. Run the host and guest commands above to gather image build, health, volume persistence, separate-VM identity, gRPC and forwarded HTTP evidence once the Acer is reachable and privileged provisioning is approved.
