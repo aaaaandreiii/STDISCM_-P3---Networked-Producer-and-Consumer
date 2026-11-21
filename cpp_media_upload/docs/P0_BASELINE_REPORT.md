@@ -80,4 +80,36 @@ done
 | P1 · `codex/agent-a` · `c9fabca` | Direct Apple Clang core test builds passed with `-O0 -g` and with `-O2 -DNDEBUG`. The agent's separate diagnostic runs passed with `-O3 -DNDEBUG` as well. The scratch pipeline runs used an alternate logger for the Mac standard library and reached READY with a 2-second preview. Missing tools returned the expected 77, fixture failure returned 1, and an intentionally disabled CHECK was detected in Release. | Ubuntu CMake/Ninja/CTest in both build modes, a full application build, and the Drogon compatibility fix are pending. |
 | P3 · `codex/agent-b` · `c51967c` | `bash tests/e2e/docker-config.sh` exited 0 with Docker Compose 5.2.0. It verified both image targets, private port bindings, isolated volumes and the one-shot producer. The VM setup command examples and Docker test scripts passed `bash -n`. | Docker image build and runtime health, data persistence, KVM guests, guest routing, managed tunnel and load remain unverified. The Mac Docker CLI has no running daemon, and the Acer's Docker install requires separate approval. |
 
-Wave 1 implementation branches remain separate pending the combined Ubuntu compile and image gate. Preserve the shared HTTP ownership when resolving the Drogon compatibility issue and verify byte range responses in the actual build environment. The [Wave 1 integration checklist](08_EVIDENCE_AND_HANDOFF.md#master-merge-gate-after-wave-1) records the remaining tests. The P3 branch's `docs/VM_SETUP.md` contains the exact protected commands for review. No privileged changes were issued.
+Wave 1 implementation was initially committed to separate branches. The subsequent integration, Drogon fix and remaining build evidence are recorded below. The [Wave 1 integration checklist](08_EVIDENCE_AND_HANDOFF.md#master-merge-gate-after-wave-1) records the remaining tests. The P3 branch's `docs/VM_SETUP.md` contains the exact protected commands for review. No privileged changes were issued.
+
+## Wave 1 integration gate
+
+From integration baseline `94a1fd0`, sequential history-preserving merges incorporated `c9fabca` as `9144374` and `c51967c` as `47a4139`. Their changed paths were disjoint. The producer, Protobuf, web assets and deferred submission material were unchanged. The master compatibility patch is `a7955f7`.
+
+### Drogon compiler diagnostic
+
+The Mac had no installed Drogon. The development archives for Ubuntu 24.04 amd64 (`libdrogon-dev 1.8.7+ds-1.1build1`, `libtrantor-dev 1.5.12+ds-1ubuntu4`, and `libjsoncpp-dev 1.9.5-6build1`) were downloaded from the Ubuntu archive and extracted in a temporary directory. The test used the packaged headers directly. Apple Clang 17 gave `error: no member named 'setAllowCompression' in 'drogon::HttpResponse'` at the original line 90 and exited 1. The same syntax check exited 0 after removal of that call.
+
+```sh
+clang++ -std=c++20 -fsyntax-only -Isrc -isystem "$sysroot/usr/include" \
+  -isystem "$sysroot/usr/include/jsoncpp" src/consumer/http.cpp
+```
+
+The file response constructors already pass `CT_CUSTOM`. Drogon excludes it from automatic compression, including ranges small enough to buffer. HTTP 206/416, body bytes and response encoding still need runtime verification. [Ubuntu package](https://packages.ubuntu.com/noble/web/libdrogon-dev) · [Drogon compression predicate](https://github.com/drogonframework/drogon/blob/v1.8.7/lib/src/HttpResponseImpl.cc#L904)
+
+### Integrated test results
+
+| Check | Result |
+|---|---|
+| Core Debug and Release on macOS arm64 | Portable CMake/CTest 3.28.3 and Apple Clang 17. Configured with `-G 'Unix Makefiles' -DBUILD_FULL_APP=OFF -DBUILD_TESTING=ON -DCMAKE_BUILD_TYPE=<config> -DOPENSSL_ROOT_DIR=/opt/homebrew/opt/openssl@3`. `cmake --build <dir> --target media_core_tests --parallel 1` and `ctest --test-dir <dir> -R '^media_core_tests$' --output-on-failure --no-tests=error` exited 0. Both native CTest runs passed 1/1. |
+| Native Mac pipeline | `cmake --build <debug-dir> --target media_pipeline_smoke --parallel 1` exited 2. Apple Clang reported that `std::osyncstream` was missing in this SDK. The native Mac smoke test is NOT RUN. |
+| Mac pipeline diagnostic | A temporary source copy substituted a mutex-based logger, then used the same Debug and Release configuration flags. `cmake --build <dir> --parallel 1` and `ctest --test-dir <dir> --verbose --no-tests=error` exited 0 in both configurations. Both diagnostic runs passed 2/2, reached READY and produced a two-second preview. |
+| Mac full-app configure | `cmake -S . -B <dir> -G 'Unix Makefiles' -DCMAKE_BUILD_TYPE=Debug -DOPENSSL_ROOT_DIR=/opt/homebrew/opt/openssl@3 -DCMAKE_PREFIX_PATH=/opt/homebrew/opt/protobuf -DBUILD_FULL_APP=ON -DBUILD_TESTING=ON` found Protobuf, then exited 1 because `gRPCConfig.cmake` was absent. |
+| Compose and other syntax | `bash tests/e2e/docker-config.sh` passed with Compose 5.2.0. `bash -n` passed on both Docker test scripts and the provisioning examples. `node --check web/app.js`, `protoc -I proto --descriptor_set_out=<tmp>/media.pb proto/media.proto`, and `git diff --check 94a1fd0 HEAD` exited 0. |
+| Ubuntu full application, images and tests | NOT RUN. The Acer connection has not reached SSH, its Docker install is still pending approval, and the Mac Docker daemon is unavailable. |
+
+### SSH and release decision
+
+The original sandboxed socket attempt failed immediately with `Operation not permitted`. Two earlier attempts outside that restriction timed out on TCP 22 before SSH authentication. The current read-only `route -n get <Acer-address>`, `ipconfig getifaddr en0` and `arp -n <Acer-address>` show that the Mac is on a different private subnet, routes the address through its default gateway and has no on-link neighbor entry for it. `ssh -G` selected the supplied address and port 22 without a jump host. This evidence establishes a network reachability problem from this connection. Ubuntu's current sshd and firewall state have not been measured. No further SSH attempts were made with the route unchanged.
+
+Wave 2 is approved after the integration gate passes. It remains held pending a reachable Acer and the combined Ubuntu build, CTest and image checks documented above. Package installation, network changes and guest creation still require separate approval of the exact commands in [VM setup](VM_SETUP.md).
