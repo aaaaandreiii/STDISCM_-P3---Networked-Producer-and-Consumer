@@ -1,7 +1,11 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-readonly IMAGE_REVISION=917a6218d499632fe3a3c6a836ab7ffaed9349cd
+if (( $# > 1 )) || { (( $# == 1 )) && [[ ! $1 =~ ^[a-f0-9]{40}$ ]]; }; then
+  printf '%s\n' 'Usage: run-image-gate.sh [approved 40-character source revision]' >&2
+  exit 2
+fi
+readonly IMAGE_REVISION=${1-917a6218d499632fe3a3c6a836ab7ffaed9349cd}
 readonly disk_cutoff_kib=$((18 * 1024 * 1024))
 readonly mem_cutoff_kib=$((1024 * 1024))
 readonly reserve_kib=$((15 * 1024 * 1024))

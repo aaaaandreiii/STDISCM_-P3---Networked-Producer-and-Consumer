@@ -175,3 +175,27 @@ The runner checks the staged source checksums, authenticated tool versions and l
 The original runner and failed evidence directory `build-image-evidence.MAPAGV/` are retained. That first attempt failed while inspecting an optional health field before either image build started. The regression test is `bash tests/e2e/docker-container-snapshot.sh`.
 
 The evidence directory `build-image-evidence.<suffix>/` contains exact logged build commands and exits, image metadata, per-image help output, before/after container snapshots, resource samples and `gate.exit`. Review the actual evidence before releasing Wave 2. Actual guest provisioning remains behind [Approval 3](VM_SETUP.md).
+
+### Revalidate a later release
+
+The previous Approval 2 covered only `917a621`. For a later revision, review the exact SHA and obtain approval before any privileged build. The same runner accepts an explicitly approved full SHA. Commands below stage only tracked files; they do not use sudo. Run on the Mac from `cpp_media_upload/` after selecting the reviewed committed revision and verified Acer SSH alias.
+
+```bash
+set -euo pipefail
+[[ "$IMAGE_REVISION" =~ ^[a-f0-9]{40}$ ]]
+git archive "$IMAGE_REVISION" .dockerignore CMakeLists.txt docker infra proto src tests web \
+  scripts/docker/approval2 |
+  ssh -T -o BatchMode=yes -o StrictHostKeyChecking=yes "$UBUNTU_LAPTOP_SSH" \
+    "set -eu; umask 077; d=\$HOME/mediadock/releases/$IMAGE_REVISION; mkdir -p \"\${d%/*}\"; mkdir \"\$d\"; cd \"\$d\"; tar -xf -;
+     printf '%s\n' '$IMAGE_REVISION' > .source-revision;
+     LC_ALL=C find .dockerignore CMakeLists.txt docker infra proto src tests web -type f -print0 |
+       LC_ALL=C sort -z | xargs -0 sha256sum > scripts/docker/approval2/source.sha256"
+```
+
+After approval, with both MediaDock guests confirmed off, use the same dedicated-key BatchMode alias from the Mac and authenticate to sudo interactively. The source and tooling checks, measurements, and other-project container comparison run again.
+
+```bash
+[[ "$IMAGE_REVISION" =~ ^[a-f0-9]{40}$ ]]
+ssh -tt -o StrictHostKeyChecking=yes "$UBUNTU_LAPTOP_SSH" \
+  "bash \"\$HOME/mediadock/releases/$IMAGE_REVISION/scripts/docker/approval2/run-image-gate.sh\" '$IMAGE_REVISION'"
+```
