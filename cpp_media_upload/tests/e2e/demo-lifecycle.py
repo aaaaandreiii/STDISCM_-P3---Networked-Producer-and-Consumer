@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 """Exercise lifecycle transitions against a test transport without VMs or Docker."""
 import contextlib
+from http.server import BaseHTTPRequestHandler, HTTPServer
 import io
 from pathlib import Path
 import socket
 import tempfile
+from threading import Thread
 import unittest
 from unittest.mock import patch
 import sys
@@ -144,6 +146,27 @@ class LifecycleTests(unittest.TestCase):
                 with self.assertRaisesRegex(RuntimeError, "occupied"):
                     demo.start()
             host.assert_not_called()
+
+    def test_forwarded_health_reads_http_response(self):
+        class HealthHandler(BaseHTTPRequestHandler):
+            def do_GET(self):
+                self.send_response(200 if self.path == "/health" else 404)
+                self.end_headers()
+                self.wfile.write(b'{"ok":true,"service":"media-upload-gallery"}')
+
+            def log_message(self, *args):
+                pass
+
+        with HTTPServer(("127.0.0.1", 0), HealthHandler) as server:
+            config = {**CONFIG, "GUI_BASE_URL": f"http://127.0.0.1:{server.server_port}"}
+            demo = Controller(config, self.directory / "state")
+            worker = Thread(target=server.serve_forever)
+            worker.start()
+            try:
+                self.assertTrue(demo.local_health())
+            finally:
+                server.shutdown()
+                worker.join()
 
     def test_config_rejects_duplicate_and_command_syntax(self):
         path = self.directory / ".env.demo"

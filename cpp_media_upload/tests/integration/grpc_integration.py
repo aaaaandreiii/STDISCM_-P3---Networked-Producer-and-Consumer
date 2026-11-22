@@ -343,6 +343,10 @@ def multiple(suite, sources):
         rows = server.ready(3)
         observed = {row["producer_id"]: (row["original_filename"], row["sha256"]) for row in rows}
         require(observed == expected, f"Unexpected producer data: {observed}")
+        ready_ids = {row["id"] for row in rows}
+        wait_for("READY worker logs before shutdown",
+                 lambda: set(re.findall(r"\[worker\] READY worker=[12] video=([0-9a-f]{32})\b",
+                                        server.log.read_text())) == ready_ids, timeout=2)
         server.stop()
         events = re.findall(r"\[(producer_\d+)\] (started|finished)\b", log)
         require(sorted(events) == sorted((worker, event) for worker in expected

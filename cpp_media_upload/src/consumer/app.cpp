@@ -11,7 +11,7 @@
 namespace fs = std::filesystem;
 namespace media {
 void log_line(const std::string& component, const std::string& message) {
-  std::osyncstream(std::cout) << utc_now() << " [" << component << "] " << message << '\n';
+  std::osyncstream(std::cout) << utc_now() << " [" << component << "] " << message << std::endl;
 }
 ConsumerApp::ConsumerApp(ConsumerConfig config)
   : config_(std::move(config)),

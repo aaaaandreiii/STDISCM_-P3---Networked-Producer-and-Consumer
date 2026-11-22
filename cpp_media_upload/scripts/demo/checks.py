@@ -1,6 +1,6 @@
 """Validation shared by the MediaDock controller and guest operator."""
 import collections
-import http.client
+from http.client import HTTPConnection
 import json
 import re
 import subprocess
@@ -18,7 +18,7 @@ def require(condition, message):
 
 
 def http(address, path, headers=None):
-    connection = http.client.HTTPConnection(address, timeout=4)
+    connection = HTTPConnection(address, timeout=4)
     try:
         connection.request("GET", path, headers=headers or {})
         reply = connection.getresponse()
