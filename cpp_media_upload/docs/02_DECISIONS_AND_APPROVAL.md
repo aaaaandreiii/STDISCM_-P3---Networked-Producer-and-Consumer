@@ -39,15 +39,17 @@ The user's plan approval authorizes **writing** provisioning instructions, optio
 - Trusted private lab network only; no unauthenticated ports exposed publicly, no keys committed.
 - No manual commands on demo day **after** one-time provisioning; Ubuntu physical laptop must be powered on and network accessible.
 
-## P0 observations to fill in (not approvals to repeat)
+## Verification checklist & approval status
 
 - [x] Owner reported CPU, RAM, swap, free disk, AMD-V, and `/dev/kvm` on the Ubuntu laptop. Hardware-conditional Wave 1 development released.
 - [x] Mac storage checked. The Mac is reserved for editing, orchestration and the browser.
-- [ ] Verify SSH reachability from Codex and query KVM API, device permissions and apt candidates.
-- [ ] Configure and validate guest SSH aliases, private addresses and SSH key trust during approved provisioning.
-- [ ] Two distinct guest VM identities verified (`machine-id`, hostname, hypervisor domain/instance), distinct Docker daemons and source revision.
-- [ ] Privileged setup tasks reviewed/authorized by user before execution.
-- [ ] Reachability: producer VM -> consumer VM gRPC, Mac -> consumer GUI via managed local tunnel/route.
+- [x] Dedicated Codex SSH identity (`$HOME/.ssh/id_ed25519_mediadock`) verified with non-interactive BatchMode on the Acer.
+- [x] Approval 1 (Native Ubuntu Build Gate): Owner approved toolchain commands. Debug and Release builds with `BUILD_FULL_APP=ON` and CTest (2/2) passed at `acc2114`.
+- [x] Approval 2 (Scoped Docker Image Gate): Owner authorized scoped Docker daemon usage. Built and verified Noble producer and consumer runtime images at `9101883`.
+- [x] Approval 3 (Host Hypervisor Setup): Owner approved libvirt installation; added 53 packages with zero removals; configured isolated bridge `192.168.100.0/24`.
+- [x] Configured and validated guest SSH aliases, private addresses (`192.168.100.10`, `192.168.100.20`), and SSH key trust during approved provisioning.
+- [x] Two distinct guest VM identities verified (`/etc/machine-id`, hostname, hypervisor domain), with distinct rootless Docker daemons and revision `9101883`.
+- [x] Reachability: producer VM -> consumer VM gRPC verified; Mac -> consumer GUI verified via managed local tunnel (`127.0.0.1:8080`).
 - [ ] Teacher test-case changes collected when provided.
 
 For the technical steps see [`10_MAC_UBUNTU_HOST_TOPOLOGY.md`](10_MAC_UBUNTU_HOST_TOPOLOGY.md). **Implementation authorization is already recorded above; do not halt P0 solely for lack of a second generic approval.**

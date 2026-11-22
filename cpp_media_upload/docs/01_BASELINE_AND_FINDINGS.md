@@ -17,18 +17,18 @@ Exact source: user-uploaded `STDISCM PS3.zip`, directory `STDISCM PS3/cpp_media_
 | Tests | `tests/core_tests.cpp`, `tests/pipeline_smoke.cpp` | Queue/DB and FFmpeg worker smoke tests | Tests have `assert()` side effects; Release behavior is unsafe |
 | Build | `CMakeLists.txt` | `BUILD_FULL_APP` and `BUILD_TESTING` targets | gRPC+Drogon full build not verified by prior delivery |
 
-## Highest-priority defects/risks to investigate
+## Baseline defects/risks and resolution status
 
-1. **Tests unsafe under `NDEBUG`:** `tests/core_tests.cpp` and `tests/pipeline_smoke.cpp` use `assert(expression_with_side_effects)` (e.g., `assert(app.queue_.try_push(v))` and `assert(db.insert_queued(v))`). Release usually removes these expressions, so test behavior changes and reports can be false. Replace with always-on test checks, not a blanket compile flag hiding the issue.
-2. **Full build unproven:** CMake `find_package(Protobuf)`, `gRPC CONFIG`, `Drogon CONFIG`, generated proto/grpc target relationships, plus Drogon API/headers must be built in pinned Ubuntu environment. Do not assume package/version compatibility.
-3. **Two VMs not provisioned:** project docs describe it but do not instantiate/test the topology. Docker-on-one-host is only a developer shortcut.
-4. **No end-to-end evidence:** gRPC uploads, HTTP responses (including Range), browser hover/player and compression across VMs need observed tests.
-5. **Queue-full happens after upload:** test harness must not expect early rejection; `q` is NOT the number of bytes, streams, or jobs including active workers.
-6. **Idempotency caveat:** the producer hashes producer ID + absolute path + size + modification time as logical upload ID. Rerunning identical files may yield an `already recorded` skip. The demo requires run-unique fixtures or independent scenario roots to create meaningful new uploads.
-7. **Runtime lifecycle and cleanup:** interrupted uploads, in-flight limits, SIGTERM while FFmpeg running, SQLite recovery and leftover `.part` files need bounded tests, not an unbounded redesign.
-8. **Compression conditional:** if input is already efficient MP4, result may not be smaller. Select deliberately high-bitrate, compressible test input for positive-size-change assertion.
-9. **Browser auto preview:** JavaScript uses `pointerenter` with a 170ms timer, muted MP4 and `pointerleave`; test in Chromium/Firefox with real hover and network-loaded assets, not just JS syntax checking.
-10. **Test-only overload delay:** CLI already supports `--demo-delay-ms` for a reliable queue-full test. Keep it out of the normal consumer container to avoid distorting ordinary performance.
+1. **Tests unsafe under `NDEBUG`:** *(RESOLVED — Wave 1 / P1)* Replaced side-effecting `assert()` statements with `tests/core/test_support.hpp` always-on macro assertions (`REQUIRE`, `REQUIRE_FALSE`). Verified that Release builds evaluate all setup expressions and pass CTest.
+2. **Full build unproven:** *(RESOLVED — Wave 1 & Native Gates)* Both Debug and Release native builds with `BUILD_FULL_APP=ON` and `BUILD_TESTING=ON` compiled, linked, and passed CTest (2/2) on the Acer Ubuntu host (`acc2114`). Docker container images for producer and consumer built cleanly (`9101883`).
+3. **Two VMs not provisioned:** *(RESOLVED — Approval 3)* Two dedicated Ubuntu Server 24.04 amd64 KVM guest VMs (`mediadock-producer` and `mediadock-consumer`) were provisioned on the Acer host on the private virtual network `192.168.100.0/24`.
+4. **No end-to-end evidence:** *(RESOLVED — Wave 2 & Wave 3)* Live two-VM demo runs completed at image revision `9101883`. gRPC streaming, overload backpressure, duplicate detection, compression, and persistence were verified end-to-end (see [`FINAL_VERIFICATION.md`](FINAL_VERIFICATION.md)).
+5. **Queue-full happens after upload:** *(ENCODED DESIGN)* The producer receives `QUEUE_FULL` after the entire video stream has completed transfer when `q` waiting slots are already occupied.
+6. **Idempotency caveat:** The producer hashes producer ID + absolute path + size + modification time as logical upload ID. Rerunning identical files yields an `already recorded` skip. The demo generator creates run-unique fixtures to ensure clean uploads.
+7. **Runtime lifecycle and cleanup:** *(RESOLVED — P6)* Hardened recovery handles interrupted streams, cleans up orphan temporary parts, requeues unfinished jobs on restart, and passes SQLite integrity checks.
+8. **Compression conditional:** *(VERIFIED — P5/P6)* High-bitrate H.264 test inputs verified compression from 32.7 MB to 416 KB with valid playback.
+9. **Browser auto preview:** *(VERIFIED — P4)* Verified with headful Chrome on macOS via the SSH loopback tunnel (`127.0.0.1:8080`), confirming 10-second muted preview playback on hover and seeking in the full player modal.
+10. **Test-only overload delay:** CLI supports `--demo-delay-ms` for reproducible queue-full demonstration, packaged in the `consumer-overload` profile.
 
 ## What to preserve (no unnecessary feature creep)
 

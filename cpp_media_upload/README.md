@@ -107,6 +107,14 @@ For exhaustive technical references, architectural specifications, and operation
 
 | Document | Primary Audience | Core Focus |
 |---|---|---|
+| [**`docs/DEMO_QUICKSTART.md`**](docs/DEMO_QUICKSTART.md) | Operators, Evaluators | Mac demo execution, `./demo.sh` commands, and environment setup |
+| [**`docs/FINAL_VERIFICATION.md`**](docs/FINAL_VERIFICATION.md) | Reviewers, Instructors | Verified results from live two-VM test runs, images, and rehearsals |
+| [**`TODO.md`**](TODO.md) | Integrators, Agents | Active acceptance gates, completion checklist, and phase tracking |
+| [**`docs/VM_SETUP.md`**](docs/VM_SETUP.md) | System Administrators | Two-guest KVM/libvirt setup on Acer and rootless guest Docker daemons |
+| [**`docs/UBUNTU_BUILD_GATE.md`**](docs/UBUNTU_BUILD_GATE.md) | DevOps, CI/CD | Acer native build gate and guarded Docker image build runner |
+| [**`docs/10_MAC_UBUNTU_HOST_TOPOLOGY.md`**](docs/10_MAC_UBUNTU_HOST_TOPOLOGY.md) | Infrastructure Engineers | Mac M4 controller + Acer KVM host hardware topology & budgets |
+| [**`docs/06_ACCEPTANCE_TEST_MATRIX.md`**](docs/06_ACCEPTANCE_TEST_MATRIX.md) | QA, Test Engineers | Mechanical test acceptance matrix across native, gRPC, and HTTP |
+| [**`docs/07_ONE_COMMAND_DEMO_SPEC.md`**](docs/07_ONE_COMMAND_DEMO_SPEC.md) | Reviewers, Evaluators | `./demo.sh` lifecycle commands, options, and output expectations |
 | [**`docs/FEATURES.md`**](docs/FEATURES.md) | Developers, QA, Reviewers | Complete functional catalog, inputs/outputs, edge cases, and workflow rules |
 | [**`docs/ARCHITECTURE.md`**](docs/ARCHITECTURE.md) | Architects, Lead Engineers | System topology, Mermaid data flows, ER diagrams, and concurrency invariants |
 | [**`docs/API.md`**](docs/API.md) | API Consumers, Integrators | gRPC service stubs, Drogon HTTP endpoints, JSON payloads, and error codes |

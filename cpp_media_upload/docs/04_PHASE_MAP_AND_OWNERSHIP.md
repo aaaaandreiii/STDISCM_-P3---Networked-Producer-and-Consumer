@@ -42,18 +42,18 @@ OPTIONAL deferred grading assets (slides, recording, verbal script): TODO only
 
 **Important:** Wave 1 may start only after P0 and approval. P3 Dockerfiles must consume existing CMake interface and may not attempt speculative edits to CMake. The master reconciles P1 fixes before building images. In Wave 2 P4 owns `http.cpp`; P2 owns `grpc_service.cpp` and `main.cpp`. No overlapping test filename or header edits. In Wave 3 P5 may require stable P3 and P4; P6 may require stable P1/P2. For a truly time-constrained Plus session, prefer sequential waves and pause agent B rather than rerun needless parallel contexts.
 
-## Phase table
+## Phase table & completion status
 
-| Phase | Agent | Model/effort | Depends | Principal artifacts | Mandatory exit gate |
-|---|---|---|---|---|---|
-| P0 | Master | Sol High briefly | User approval | Source baseline, contracts, branches, env checklist | Signed decisions and clean baseline |
-| P1 | A | Sol Medium | P0 | Always-on tests, native CMake build fixes | Debug+Release CTest; full target compile |
-| P3 | B | Sol Medium | P0 | Dockerfiles, Compose, env example, VM prep docs | Builds images; correct separate nodes/volumes |
-| P2 | A | Sol Medium→High if needed | P1 (uses P3 images when ready) | gRPC integration and targeted concurrency fixes | Real one-upload + p/c/q tests |
-| P4 | B | Sol Medium | P3, baseline API; can overlap P2 | HTTP range/browser tests and targeted fixes | Gallery hover+click and Range tests |
-| P6 | A | Sol High only if needed | P2; P3 environment | Restart/partial/failure/load tests | Repeatable stress evidence and bounded shutdown |
-| P5 | B | Sol Medium | P3+P4, stable P2 contract | `demo.sh`, fixture/test utilities, docs | First run AND rerun succeed nondestructively |
-| P7 | Master | Sol High for final review | All | Merged tree, README, verified report, release tag | All required acceptance matrix items witnessed |
+| Phase | Agent | Model/effort | Depends | Principal artifacts | Mandatory exit gate | Status |
+|---|---|---|---|---|---|---|
+| P0 | Master | Sol High briefly | User approval | Source baseline, contracts, branches, env checklist | Signed decisions and clean baseline | **PASS** (Baseline frozen) |
+| P1 | A | Sol Medium | P0 | Always-on tests, native CMake build fixes | Debug+Release CTest; full target compile | **PASS** (Release assertions verified) |
+| P3 | B | Sol Medium | P0 | Dockerfiles, Compose, env example, VM prep docs | Builds images; correct separate nodes/volumes | **PASS** (Image gate verified at `9101883`) |
+| P2 | A | Sol Medium→High if needed | P1 (uses P3 images when ready) | gRPC integration and targeted concurrency fixes | Real one-upload + p/c/q tests | **PASS** (Merged at `548ea66`) |
+| P4 | B | Sol Medium | P3, baseline API; can overlap P2 | HTTP range/browser tests and targeted fixes | Gallery hover+click and Range tests | **PASS** (Merged at `042e8a6`) |
+| P6 | A | Sol High only if needed | P2; P3 environment | Restart/partial/failure/load tests | Repeatable stress evidence and bounded shutdown | **PASS** (Merged at `bfef9ac`) |
+| P5 | B | Sol Medium | P3+P4, stable P2 contract | `demo.sh`, fixture/test utilities, docs | First run AND rerun succeed nondestructively | **PASS** (Merged at `f59b3e5`) |
+| P7 | Master | Sol High for final review | All | Merged tree, README, verified report, release tag | All required acceptance matrix items witnessed | **PASS** (Verified in [`FINAL_VERIFICATION.md`](FINAL_VERIFICATION.md)) |
 
 ## File ownership — explicit conflict rules
 

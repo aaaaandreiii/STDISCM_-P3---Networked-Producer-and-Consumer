@@ -1,75 +1,47 @@
-# ChatGPT Implementation Handoff — MediaDock (2026-11-13)
+# ChatGPT Implementation Handoff & Progress — MediaDock
 
-> **Highest-priority update:** The user explicitly authorized implementation on 2026-11-13: **"i approve of the plan. please implement!"**. The previously approved C++ architecture is now implemented as a source-code candidate. Original statements saying "NO implementation has been authorized" are historical and superseded. The user selected **C++** and **a C++ HTTP server with a browser GUI**; do not switch back to Python or Qt. The original standing rule still applies to new consequential stages: **"moving forward, please plan thoroughly, please ask me if you have any questions, please confirm you plan with me, before implementing anything."**
+> **Latest Status Update (2026-11-22):** The full implementation and two-VM deployment have been **completed and verified** across all phases (P0 through P6). Both live demo runs completed at image revision `9101883` across two dedicated KVM guest VMs on the Acer host. The one-command demo interface `./demo.sh` (`start`, default demo, `status`, `stop`) is operational from the Mac terminal. For detailed run evidence, refer to [FINAL_VERIFICATION.md](FINAL_VERIFICATION.md).
 
-## Current status
+---
 
-- **Source created:** Producer, consumer, Protobuf definitions, worker pool, bounded queue, SQLite store, OpenSSL SHA-256, optional FFmpeg compression, Drogon HTTP API, HTML/CSS/JS gallery.
-- **Slides created:** `docs/MediaDock_Presentation.pptx` (13 editable slides; status slide explicitly marks full integration pending).
-- **Docs created:** `README.md`, `docs/ARCHITECTURE.md`, `docs/TEST_RESULTS.md`, `docs/DEMO_RECORDING_GUIDE.md`.
-- **Local tests:** `media_core_tests` and `media_pipeline_smoke` both compiled and passed with `BUILD_FULL_APP=OFF`; JS syntax check passed.
-- **Not verified:** Full application build and cross-VM gRPC/HTTP integration; gRPC, Protobuf, Drogon unavailable in authoring environment. VirtualBox VMs not created; no actual recording possible. Teacher test cases still pending.
-- **No student VM state changed** by ChatGPT: sources are packaged artifacts only.
+## 1. Project Progression Timeline
 
-## Files and responsibilities
+### Milestone 1: Initial Source Creation & Smoke Tests (2026-11-13)
+* Initial C++20 implementation of `media_producer`, `media_consumer`, `BoundedQueue`, SQLite metadata database, and Drogon HTTP routes.
+* Core unit tests (`media_core_tests`) and FFmpeg processing smoke tests (`media_pipeline_smoke`) passed in container environment with `BUILD_FULL_APP=OFF`.
 
-```text
-CMakeLists.txt                       C++20 targets; generated Protobuf/grpc sources
-proto/media.proto                   UploadVideo(stream), GetUploadStatus, Health
-src/common/queue.hpp               bounded FIFO; try_push, blocking pop, close
-src/common/util.hpp/.cpp            IDs, hashing helper, filenames, POSIX process runner
-src/common/database.hpp/.cpp        SQLite records, hash uniqueness, state transitions
-src/producer/main.cpp               exactly p folder-bound gRPC producer threads
-src/consumer/app.hpp/.cpp           c worker threads, FFmpeg, recovery, publication
-src/consumer/grpc_service.hpp/.cpp  streaming receiver, SHA-256, queue admission
-src/consumer/http.hpp/.cpp          Drogon HTTP gallery/API/media byte ranges
-src/consumer/main.cpp               CLI, bootstrap, shutdown, HTTP/gRPC servers
-web/index.html, app.js, style.css   browser gallery, hover + full player
- tests/core_tests.cpp                queue, SHA, SQLite, concurrent hash test
- tests/pipeline_smoke.cpp            real FFmpeg worker pipeline smoke test
- docs/...                           architecture/demo/tests/slide deck
-```
+### Milestone 2: Phased Implementation Approval & Topology Definition (2026-11-21)
+* User approved the phased multi-agent implementation plan (P0 through P7).
+* Hardware environment locked:
+  * **Controller / Client:** Base-model Apple M4 MacBook Air (macOS). Runs Codex, Git, SSH orchestration, `./demo.sh`, and client web browser.
+  * **Build & Hypervisor Host:** Acer Swift SF314-42 (Ryzen 5 4500U, Ubuntu 26.04.1 LTS amd64, 8 GB RAM, `/dev/kvm` available).
+  * **Target Deployment:** Two dedicated Ubuntu Server 24.04 amd64 KVM guest VMs (`mediadock-producer` and `mediadock-consumer`) with isolated rootless Docker daemons.
 
-## Decisions encoded in implementation
+### Milestone 3: Wave 1 Implementation & Release Hardening (2026-11-21)
+* **Agent A (P1):** Fixed assertion side-effects under `-DNDEBUG` by introducing always-on test checks in `tests/core/test_support.hpp`.
+* **Agent B (P3):** Packaged multi-stage Noble runtime and build Dockerfile (`docker/Dockerfile`), headless build Compose spec (`infra/build.compose.yml`), and per-guest Compose specs (`infra/consumer.compose.yml`, `infra/producer.compose.yml`).
+* Both branches merged into `codex/integration` and released to `main`.
 
-1. **Language/framework:** C++20; CMake/Ninja; synchronous gRPC C++ client-streaming; Drogon for HTTP and vanilla JS in browser.
-2. **Queue:** `q` is number of *waiting completed video jobs* (excluding active worker jobs and in-flight transfers); FIFO and drop newest completed upload when full. With `c>1`, completion order may differ from dequeue order.
-3. **Producer:** `p` threads each scan `producer_1`...`producer_p` once per run; one video at a time per worker. Chunk size 64KiB default, max 256KiB.
-4. **Consumer:** `c` worker `std::jthread`s; HTTP and gRPC handler threads are separate. Queue shared state protected by mutex/CV; admission serialized by mutex; SQLite unique partial index for SHA-256 claims; independent upload-count semaphore.
-5. **Storage:** `incoming/` temporary, `uploads/` one final video folder, `previews/` derived assets, SQLite metadata. Server-generated IDs prevent filename collisions.
-6. **Bonus 1:** Queue-full status **after complete transfer** (`QUEUE_FULL`); early reservation not implemented.
-7. **Bonus 2:** SHA-256 of *original* streamed bytes; byte-identical videos have one accepted claim; failed jobs release hash reservation. No semantic perceptual duplicates.
-8. **Bonus 3:** Optional FFmpeg transcode to H.264/AAC MP4, thumbnail JPEG, up-to-ten-second muted preview MP4; preserves smaller compatible original where appropriate.
-9. **GUI:** Drogon routes `GET /`, `/app.js`, `/style.css`, `/api/videos`, `/api/videos/{id}`, `/api/videos/{id}/thumbnail`, `/preview`, `/stream`, `/api/stats`, `/health`. Range 206/416 implemented but not full tested.
-10. **Limitations:** Class project private network, no TLS/auth/public release hardening, no global disk quota. Crash recovery best-effort; no guaranteed durable exactly-once queue.
+### Milestone 4: Acer Build Gates Passed (2026-11-21)
+* **Approval 1 (Native Ubuntu Build Gate):** Over BatchMode SSH using key `id_ed25519_mediadock`, built full Debug and Release configurations with `BUILD_FULL_APP=ON` and `BUILD_TESTING=ON`. All binaries compiled, linked, and passed CTest 2/2.
+* **Approval 2 (Scoped Docker Image Gate):** Built `mediadock/consumer` and `mediadock/producer` Noble runtime images. Verified `--help` flags in isolated containers; verified zero baseline container disruption via automated snapshots (`scripts/docker/approval2/run-image-gate.sh`).
 
-## Immediate next authorized technical milestone to discuss
+### Milestone 5: Wave 2 Integration & Gallery Acceptance (2026-11-21–22)
+* **Agent A (P2):** Implemented multi-threaded gRPC streaming, `p` producer scanning, `c` consumer worker processing, and graceful shutdown handling.
+* **Agent B (P4):** Implemented Drogon HTTP gallery routes, RFC 7233 byte-range streaming (`206 Partial Content` and `416`), 10-second muted hover previews, and full-video modal player seeking. Verified with headful Chrome on macOS via SSH loopback tunnel.
 
-1. Ask user only **host OS + available RAM/free disk** to tailor the two-VM resource settings. Do not repeat language/GUI/bonus questions.
-2. Plan setup and dependency installation in two Ubuntu 24.04 VMs (VirtualBox recommended), confirm the plan with user before changes to their machines.
-3. Build full project with gRPC+Protobuf+Drogon on both VMs. Fix real compiler/linker errors as needed. Re-run local tests.
-4. End-to-end smoke: upload one video and inspect `/api/videos`/browser playback; then deterministic `QUEUE_FULL`, duplicate, compression and restart tests.
-5. Capture actual demo video and update slides with observed real test results (do not invent them). Instructor test cases still pending.
+### Milestone 6: Approval 3, Wave 3 Automation & Two-VM Live Verification (2026-11-22)
+* **Approval 3 (Host Hypervisor Setup):** Installed libvirt 12.0.0, QEMU 10.2.1, and virt-install 5.1.0 on Acer host. Configured isolated virtual NAT network (`192.168.100.0/24`).
+* **Guest VM Provisioning:** Provisioned `mediadock-producer` (`192.168.100.10`) and `mediadock-consumer` (`192.168.100.20`). Loaded verified revision images (`9101883`) into rootless guest Docker daemons.
+* **Agent B (P5):** Implemented single-command lifecycle `./demo.sh` (`start`, default demo, `status`, `stop`) with automated SSH tunneling and health checks.
+* **Agent A (P6):** Hardened failure recovery: abandoned upload cleanup, queue restart requeuing, unwritable storage handling, and database integrity.
+* **Live Two-VM Acceptance:** Completed two full `./demo.sh` runs across the two guest VMs with zero manual intervention. Verified normal uploads, duplicate detection, FFmpeg compression (32.7 MB $\to$ 416 KB), overload rejection (12 `QUEUE_FULL` drops), gallery routes, and restart persistence.
 
-## Build quick reference
+---
 
-```bash
-# On Ubuntu 24.04, install C++20, gRPC/Protobuf, Drogon, SQLite/OpenSSL and FFmpeg as in README.
-cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DBUILD_FULL_APP=ON
-cmake --build build --parallel 4
-ctest --test-dir build --output-on-failure
+## 2. Active Deliverables Status
 
-# Consumer VM
-./build/media_consumer --c 2 --q 3 --data ./data --web ./web \
- --grpc-bind 0.0.0.0:50051 --http-host 0.0.0.0 --http-port 8080 --compress on
-# Producer VM
-./build/media_producer --p 3 --source-root ./samples --server <CONSUMER_IP>:50051
-```
-
-## Test truthfulness rule
-
-Two standalone tests pass, including an actual FFmpeg generated MP4 processed by a C++ worker. The complete gRPC/Drogon executables have **not** been built in this environment, so the end-to-end system is **not yet verified**. Do not declare the assignment complete or provide fabricated video demonstration evidence. The editable slide deck and recording guide are deliverable drafts for the user to update after real VM tests.
-
-## User standing instruction, repeated verbatim
-
-> moving forward, please plan thoroughly, please ask me if you have any questions, please confirm you plan with me, before implementing anything.
+- **Source Code & Build Configuration:** Complete and verified across native Ubuntu and containerized KVM guests.
+- **Automated Demo Runner (`./demo.sh`):** Fully operational from the Mac terminal.
+- **Verification Evidence:** Documented in [FINAL_VERIFICATION.md](FINAL_VERIFICATION.md).
+- **Deferred Tasks:** Presentation slides (`docs/MediaDock_Presentation.pptx`), screen-recorded video demo, and verbal submission script remain tracked in [TODO.md](../TODO.md).
