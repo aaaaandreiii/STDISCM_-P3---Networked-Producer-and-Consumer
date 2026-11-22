@@ -7,56 +7,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [1.0.0] - 2026-11-21
+## [1.0.0-rc1] - 2026-11-22
 
 ### Added
-* **Production Two-VM System:** Complete networked media upload and streaming service spanning VM 1 (`media_producer`) and VM 2 (`media_consumer`).
-* **Multi-Threaded Producer Engine:** Configurable `p` POSIX worker threads scanning isolated directory paths (`producer_1` ... `producer_p`) and streaming files deterministically.
-* **gRPC Streaming Upload Service:** Implemented `UploadVideo` client-streaming RPC supporting metadata preamble and 64 KiB–256 KiB binary chunk slices.
-* **Synchronized Bounded Queue:** Thread-safe `BoundedQueue<T>` with leaky-bucket drop semantics, capacity `q`, and conditional variable synchronization.
-* **Immediate Rejection Notification:** Producer receives explicit `QUEUE_FULL` status enum when the waiting queue reaches maximum capacity.
-* **Cryptographic Streaming Deduplication:** Continuous SHA-256 hash calculation via OpenSSL EVP with SQLite partial unique index (`idx_videos_sha256_active`) preventing byte-identical re-ingestion.
-* **Automated FFmpeg Media Pipeline:**
-  * Subprocess execution via POSIX `posix_spawnp` (eliminating command injection).
-  * Video compression using `libx264` (CRF 28, preset `veryfast`) and AAC audio with `+faststart`.
-  * Smart bypass retaining smaller, web-compatible originals over re-encoded files.
-  * Automated 10-second muted preview generation (`640x360` MP4).
-  * High-resolution poster frame extraction (`480px` JPEG thumbnail).
-* **Consolidated File Storage:** Standardized single-directory media storage in `data/uploads/` and `data/previews/` using atomic filesystem renames.
-* **Drogon C++ Web Server:** High-performance HTTP server serving static frontend assets, JSON REST APIs (`/api/videos`, `/api/stats`, `/health`), and media files.
-* **RFC 7233 Byte-Range Streaming:** Full support for `HTTP 206 Partial Content` and byte-range seek requests on full video and preview streams.
-* **Interactive Web Gallery:** Modern responsive browser UI featuring video cards, hover-activated 10-second looping previews, click-to-play full modal player, and live HUD metrics.
-* **Crash Recovery Engine:** Automatic startup reconciliation restoring `READY` status for intact asset triples and re-enqueuing unfinished jobs with surviving raw temporary parts.
-* **Comprehensive Test Suite:** Unit testing framework (`media_core_tests`) and FFmpeg pipeline integration test (`media_pipeline_smoke`).
-* **Complete Documentation Suite:** Standardized markdown guides covering Architecture, Features, Security, API, Deployment, Testing, Limitations, Roadmap, and Business impact.
-
-### Changed
-* Transitioned all string-based process spawns to structured `posix_spawnp` execution vectors for injection immunity.
-* Streamlined gRPC buffer management to eliminate full-file memory caching.
-
----
-
-## [0.9.0-rc1] - 2026-11-13
-
-### Added
-* `media_core_tests` covering queue bounds, multi-threaded contention, token validation, and SQLite partial index isolation.
-* `media_pipeline_smoke` integrating synthetic test video generation via FFmpeg and verifying preview duration $\le 10.5\text{s}$.
-* Support for `--demo-delay-ms` flag enabling reproducible live queue saturation demonstrations.
-* Structured logging with timestamped thread synchronization via `std::osyncstream`.
+* **Single-Command Demo Orchestrator (`./demo.sh`):** Implemented idempotent Mac lifecycle script with subcommands `start`, default demo, `status`, and `stop`, managing SSH jump host connections, localhost port tunneling, and healthchecks.
+* **Two-VM KVM Guest Deployment:** Configured two isolated Ubuntu Server 24.04 amd64 guest VMs (`mediadock-producer` at `192.168.100.10`, `mediadock-consumer` at `192.168.100.20`) running independent rootless Docker daemons over a dedicated virtual bridge.
+* **End-to-End Acceptance Suites:**
+  * Multi-threaded gRPC streaming integration suite (`tests/integration/grpc_integration.py`).
+  * Process crash and upload recovery suite (`tests/integration/recovery_integration.py`).
+  * Lifecycle controller regressions (`tests/e2e/demo-lifecycle.py`).
+  * Headful browser acceptance suite using Chrome (`tests/e2e/browser-gallery.mjs`).
+* **Release Verification Record:** Documented live two-VM test execution metrics, receipts, and benchmarks in `docs/FINAL_VERIFICATION.md` and operator runbook in `docs/DEMO_QUICKSTART.md`.
 
 ### Fixed
-* Fixed a race condition where failed job records held hash locks, preventing legitimate re-upload of fixed files.
-* Resolved byte-range boundary edge cases for suffix ranges (`bytes=-500`) in Drogon HTTP handler.
+* Fixed Docker container web permissions by normalizing file modes to `0644` in `docker/Dockerfile`, enabling unprivileged user UID 10001 to serve static gallery assets.
+* Added startup gallery route checks (`/`, `/app.js`, `/style.css`) in demo controller to guarantee UI readiness before reporting completion.
 
 ---
 
-## [0.5.0-alpha] - 2026-11-12
+## [0.9.0] - 2026-11-21
+
+### Added
+* **Approval 1 (Native Ubuntu Build Gate):** Full application compilation with `BUILD_FULL_APP=ON` and `BUILD_TESTING=ON` in both Debug and Release configurations on physical Acer Ubuntu 26.04 x86_64 host.
+* **Approval 2 (Scoped Docker Image Gate):** Multi-stage Docker build producing `mediadock/consumer` and `mediadock/producer` runtime images with automated container snapshot comparisons.
+* **Release Assertion Hardening:** Introduced always-evaluated `REQUIRE` and `REQUIRE_FALSE` macros in `tests/core/test_support.hpp` to prevent side-effecting assertions from being stripped under `-DNDEBUG`.
+* **Modular Compose Infrastructure:** Created separate per-guest Compose specifications (`infra/consumer.compose.yml`, `infra/producer.compose.yml`, and `infra/build.compose.yml`) with strict CPU/memory limits and non-root execution (`10001:10001`).
+* **Dedicated Non-Interactive SSH Identity:** Configured and verified `$HOME/.ssh/id_ed25519_mediadock` with BatchMode authentication for remote Mac-to-Acer build operations.
+
+### Changed
+* Serialized Docker build commands (`--parallel 1`) in Dockerfile and Compose to eliminate memory thrashing on 8 GB RAM hypervisors.
+
+---
+
+## [0.5.0] - 2026-11-13
 
 ### Added
 * Initial Protocol Buffer definition (`media.proto`) with `UploadVideo`, `GetUploadStatus`, and `Health` RPC definitions.
 * SQLite schema definition (`metadata.db`) with `videos` table and status transition invariants (`QUEUED`, `PROCESSING`, `READY`, `FAILED`).
-* Base CMake configuration with Ninja generator support and modular `BUILD_FULL_APP` toggle.
-* Skeleton Drogon route handlers and static HTML/CSS template.
+* Multi-threaded producer engine skeleton with directory scanning and chunk streaming.
+* Synchronized `BoundedQueue<T>` with leaky-bucket drop semantics and `QUEUE_FULL` status replies.
+* Streaming SHA-256 calculation via OpenSSL EVP with SQLite partial unique index (`idx_videos_sha256_active`).
+* POSIX `posix_spawnp` execution pipeline for FFmpeg transcoding, poster thumbnail, and 10-second muted preview generation.
+* Unit test suite (`media_core_tests`) and FFmpeg pipeline smoke test (`media_pipeline_smoke`).
+* Web gallery single-page application (`web/index.html`, `web/style.css`, `web/app.js`).
 
 ---
 

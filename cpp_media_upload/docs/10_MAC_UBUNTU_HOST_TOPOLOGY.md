@@ -30,8 +30,8 @@ Mac -> SSH jump host -> guest SSH; Mac localhost:8080 -> SSH forward -> VM B:808
 | Acer Ubuntu laptop | Owner inventory: Acer Swift SF314-42, Ubuntu 26.04.1 LTS x86_64, AMD Ryzen 5 4500U, six logical CPUs, AMD-V, and `/dev/kvm` present. |
 | Ubuntu RAM and swap | Owner inventory: 8 GB installed, 6.6 GiB visible, 6.1 GiB available, 4 GiB swap unused. |
 | Ubuntu storage | Owner inventory: 512 GB NVMe, 66 GiB Ubuntu filesystem, 53 GiB free. Keep all VM and build data on the Ubuntu filesystem. Preserve all existing data and Windows partitions. |
-| Ubuntu Docker and virtualization tooling | Owner reports Docker absent. Docker Engine supports Ubuntu 26.04 amd64. Ubuntu publishes libvirt and QEMU packages for this release. Configured apt candidates and installed tools remain unverified on the laptop. |
-| SSH | An existing host key matched locally. Two noninteractive SSH attempts exited 255 after timing out on TCP 22. The Mac routes the laptop's private address through its default gateway on `en0`. The owner supplied the successful baseline inventory and approved development. SSH reachability from this session, the KVM API and effective device permissions remain pending for deployment. |
+| Ubuntu Docker and virtualization tooling | Docker Engine is confirmed installed and active on the Acer. Approval 3 installed libvirt 12.0.0, QEMU 10.2.1, and virt-install 5.1.0. Two KVM guest VMs (`mediadock-producer` and `mediadock-consumer`) are provisioned on the dedicated NAT network (`192.168.100.0/24`) with independent rootless Docker daemons running image revision `9101883`. |
+| SSH | Dedicated Codex SSH key (`$HOME/.ssh/id_ed25519_mediadock`) verified with non-interactive BatchMode across the Acer jump host and both guest SSH aliases. Password-free execution operational via Mac login SSH agent. |
 
 [Docker Engine support](https://docs.docker.com/engine/install/ubuntu/) · [Ubuntu libvirt packages](https://packages.ubuntu.com/search?keywords=libvirt&suite=resolute) · [Ubuntu QEMU packages](https://packages.ubuntu.com/eu/source/resolute-updates/qemu)
 

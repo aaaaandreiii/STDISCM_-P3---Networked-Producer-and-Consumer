@@ -107,6 +107,13 @@ This documentation suite is organized into modular guides:
 
 | Document | Primary Audience | Core Focus |
 |---|---|---|
+| [**DEMO_QUICKSTART.md**](DEMO_QUICKSTART.md) | Operators, Evaluators | Mac demo execution, `./demo.sh` commands, and environment setup |
+| [**FINAL_VERIFICATION.md**](FINAL_VERIFICATION.md) | Reviewers, Instructors | Verified results from live two-VM test runs, images, and rehearsals |
+| [**VM_SETUP.md**](VM_SETUP.md) | System Administrators | Two-guest KVM/libvirt setup on Acer and rootless guest Docker daemons |
+| [**UBUNTU_BUILD_GATE.md**](UBUNTU_BUILD_GATE.md) | DevOps, CI/CD | Acer native build gate and guarded Docker image build runner |
+| [**10_MAC_UBUNTU_HOST_TOPOLOGY.md**](10_MAC_UBUNTU_HOST_TOPOLOGY.md) | Infrastructure Engineers | Mac M4 controller + Acer KVM host hardware topology & budgets |
+| [**06_ACCEPTANCE_TEST_MATRIX.md**](06_ACCEPTANCE_TEST_MATRIX.md) | QA, Test Engineers | Mechanical test acceptance matrix across native, gRPC, and HTTP |
+| [**07_ONE_COMMAND_DEMO_SPEC.md**](07_ONE_COMMAND_DEMO_SPEC.md) | Reviewers, Evaluators | `./demo.sh` lifecycle commands, options, and output expectations |
 | [**FEATURES.md**](FEATURES.md) | Developers, QA, Reviewers | Complete functional catalog, inputs/outputs, edge cases, and workflow rules |
 | [**ARCHITECTURE.md**](ARCHITECTURE.md) | Architects, Lead Engineers | System topology, Mermaid data flows, ER diagrams, and concurrency invariants |
 | [**API.md**](API.md) | API Consumers, Integrators | gRPC service stubs, Drogon HTTP endpoints, JSON payloads, and error codes |
@@ -117,3 +124,5 @@ This documentation suite is organized into modular guides:
 | [**ROADMAP.md**](ROADMAP.md) | Product Managers, Stakeholders | Tactical short-term fixes and multi-phase long-term scaling milestones |
 | [**BUSINESS.md**](BUSINESS.md) | Executives, Investors, Clients | Problem statement, market ROI, user personas, and cost efficiency analysis |
 | [**CHANGELOG.md**](CHANGELOG.md) | Everyone | Semantic version history, feature additions, and release notes |
+| [**TEST_RESULTS.md**](TEST_RESULTS.md) | QA, Evaluators | Component and native gate verification logs |
+| [**HANDOFF_PROGRESS.md**](HANDOFF_PROGRESS.md) | Project Leads | Historical development progress and milestone evolution |

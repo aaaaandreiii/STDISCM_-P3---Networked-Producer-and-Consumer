@@ -157,86 +157,101 @@ sudo systemctl enable --now mediadock-consumer
 
 ---
 
-## 4. Docker & Containerized Orchestration
+## 4. Two-VM Containerized Orchestration & Single-Command Demo
 
-MediaDock supports multi-stage container builds.
+MediaDock packages an audited multi-stage Dockerfile (`docker/Dockerfile`) and modular Compose specifications in `infra/` to support isolated, resource-governed deployment across two dedicated KVM guest VMs.
 
-### 4.1 Multi-Stage Dockerfile (`Dockerfile`)
-```dockerfile
-# Stage 1: Build environment
-FROM ubuntu:24.04 AS builder
-ENV DEBIAN_FRONTEND=noninteractive
-RUN apt-get update && apt-get install -y \
-    build-essential cmake ninja-build pkg-config \
-    libssl-dev libsqlite3-dev libprotobuf-dev protobuf-compiler \
-    protobuf-compiler-grpc libgrpc++-dev libdrogon-dev libjsoncpp-dev
+### 4.1 Production Multi-Stage Dockerfile (`docker/Dockerfile`)
+The production Dockerfile is pinned to `ubuntu:noble-20261110.1` and uses multi-stage targeting to separate build tooling from minimal runtime images:
 
-WORKDIR /app
-COPY . .
-RUN cmake -S cpp_media_upload -B build -G Ninja \
-    -DCMAKE_BUILD_TYPE=Release \
-    -DBUILD_FULL_APP=ON && \
-    cmake --build build --parallel $(nproc)
+* **Stage 1 (`runtime`):** Minimal base with `libgrpc++`, `libprotobuf`, `libsqlite3`, and `libssl`. Defines the unprivileged user `mediadock` (`UID/GID 10001:10001`).
+* **Stage 2 (`consumer-runtime`):** Extends `runtime` with Drogon, `libjsoncpp`, `ffmpeg`, and `curl` for healthchecks.
+* **Stage 3 (`builder`):** Compiles the full application with CMake and Ninja serially (`--parallel 1`) to eliminate memory thrashing, validates `ffmpeg`/`ffprobe`, executes `ctest` with zero test skips, and strips debug symbols.
+* **Stage 4 (`producer`):** Minimal runtime image containing only `/usr/local/bin/media_producer` running as `10001:10001`.
+* **Stage 5 (`consumer`):** Minimal runtime image containing `/usr/local/bin/media_consumer`, static assets in `/opt/mediadock/web/`, and seeded permissions on `/data` directories.
 
-# Stage 2: Runtime environment
-FROM ubuntu:24.04 AS runtime
-ENV DEBIAN_FRONTEND=noninteractive
-RUN apt-get update && apt-get install -y \
-    libssl3 libsqlite3-0 libprotobuf32t64 libgrpc++1.51 \
-    libdrogon1 libjsoncpp25 ffmpeg curl && \
-    rm -rf /var/lib/apt/lists/*
-
-WORKDIR /opt/mediadock
-COPY --from=builder /app/build/media_consumer /opt/mediadock/bin/
-COPY --from=builder /app/build/media_producer /opt/mediadock/bin/
-COPY --from=builder /app/cpp_media_upload/web /opt/mediadock/web
-
-EXPOSE 50051 8080
-CMD ["/opt/mediadock/bin/media_consumer", "--data", "/data", "--web", "/opt/mediadock/web"]
+```bash
+# Build both images using the headless build specification
+export IMAGE_REVISION=$(git rev-parse HEAD)
+docker compose -f infra/build.compose.yml build
 ```
 
-### 4.2 Docker Compose (`docker-compose.yml`)
+### 4.2 Modular Docker Compose Specifications (`infra/`)
+
+Instead of a single-host compose file, MediaDock divides services into separate per-guest configurations matching the two-VM topology:
+
+#### Consumer Node (`infra/consumer.compose.yml` on VM 2)
 ```yaml
-version: '3.8'
+name: mediadock-consumer
 
 services:
   consumer:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    command: ["/opt/mediadock/bin/media_consumer", "--c", "4", "--q", "10", "--data", "/data", "--web", "/opt/mediadock/web"]
+    image: "mediadock/consumer:${IMAGE_REVISION:?set git SHA}"
+    pull_policy: never
+    restart: unless-stopped
+    init: true
+    cpus: 1.75
+    mem_limit: 1600m
     ports:
-      - "50051:50051"
-      - "8080:8080"
+      - "${CONSUMER_PRIVATE_IP:?IP}:50051:50051"
+      - "${CONSUMER_PRIVATE_IP:?IP}:8080:8080"
     volumes:
-      - mediadock_data:/data
-    networks:
-      - mediadock_net
+      - consumer-data:/data
+    command: ["--c", "2", "--q", "5", "--grpc-bind", "0.0.0.0:50051", "--http-host", "0.0.0.0", "--http-port", "8080", "--data", "/data", "--web", "/opt/mediadock/web", "--compress", "on"]
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "http://127.0.0.1:8080/health"]
+      interval: 5s
 
+  consumer-overload:
+    image: "mediadock/consumer:${IMAGE_REVISION:?set git SHA}"
+    profiles: [overload]
+    ports:
+      - "${CONSUMER_PRIVATE_IP:?IP}:50052:50051"
+      - "${CONSUMER_PRIVATE_IP:?IP}:8081:8080"
+    volumes:
+      - overload-data:/data
+    command: ["--c", "1", "--q", "2", "--demo-delay-ms", "2500", "--grpc-bind", "0.0.0.0:50051", "--http-host", "0.0.0.0", "--http-port", "8080", "--data", "/data", "--web", "/opt/mediadock/web"]
+```
+
+#### Producer Node (`infra/producer.compose.yml` on VM 1)
+```yaml
+name: mediadock-producer
+
+services:
   producer:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    command: ["/opt/mediadock/bin/media_producer", "--p", "2", "--source-root", "/samples", "--server", "consumer:50051"]
+    image: "mediadock/producer:${IMAGE_REVISION:?set git SHA}"
+    pull_policy: never
+    restart: "no"
+    init: true
+    cpus: 1.0
+    mem_limit: 256m
     volumes:
-      - ./samples:/samples:ro
-    depends_on:
-      - consumer
-    networks:
-      - mediadock_net
-
-volumes:
-  mediadock_data:
-
-networks:
-  mediadock_net:
-    driver: bridge
+      - type: bind
+        source: "${SAMPLES_DIR:-../samples}"
+        target: /samples
+        read_only: true
+    command: ["--p", "3", "--source-root", "/samples", "--server", "${CONSUMER_PRIVATE_IP}:50051"]
 ```
 
-Run cluster:
+### 4.3 Mac Single-Command Orchestrator (`./demo.sh`)
+
+The Mac controller script orchestrates the two KVM guests, SSH tunneling, health probes, and demo scenarios:
+
 ```bash
-docker compose up --build
+# Start or resume VMs, check health, and forward localhost:8080
+./demo.sh start
+
+# Execute full demo suite (normal uploads, duplicate, compression, overload)
+./demo.sh
+
+# Inspect live status without mutation
+./demo.sh status
+
+# Gracefully drain active work, power off guests, and close tunnel
+./demo.sh stop
 ```
+
+For detailed configuration instructions, see [`docs/DEMO_QUICKSTART.md`](DEMO_QUICKSTART.md) and [`docs/VM_SETUP.md`](VM_SETUP.md). Live verification logs are recorded in [`docs/FINAL_VERIFICATION.md`](FINAL_VERIFICATION.md).
 
 ---
 
