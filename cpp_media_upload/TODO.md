@@ -12,9 +12,9 @@
 - [x] Owner completed the native toolchain install. Acer Debug and Release builds and CTest passed over BatchMode SSH.
 - [x] Owner granted scoped [existing Docker daemon use](docs/UBUNTU_BUILD_GATE.md#approval-2--build-with-the-acers-existing-docker) for the two MediaDock images at `917a621`.
 - [x] Approval 2 passed on the Acer for `917a621` after both image builds, isolated help checks and container state comparison. Wave 2 released.
-- [x] Owner approved proceeding with [Approval 3](docs/VM_SETUP.md). The exact host-tools installer is staged on the Acer and needs interactive sudo.
+- [x] Owner approved the [Approval 3 host-tools installer](docs/VM_SETUP.md). Interactive installation passed with 53 new packages, no upgrades and no removals.
 - [x] Preflight verified KVM API version 12 and device access, APT candidates and initial resource headroom.
-- [ ] Complete the approved host-tools installation, then verify the system libvirt socket and select nonoverlapping VM network and SSH settings.
+- [ ] Run the reviewed two-guest provisioning after approval. The system libvirt socket and empty inventory passed. The proposed subnet passed the host route check, with Docker IPAM verification built into the runner.
 - [x] Confirmed two separate Ubuntu VMs with Docker containers inside each are acceptable. Single-host Docker mode is test-only.
 - [ ] P0: verify ports 50051/8080/50052/8081, test media acceptance; confirm exact privileged host/VM installation steps before executing them (plan approved, unattended sudo not automatically approved).
 - [ ] P0/P3: establish guest SSH identities, private VM network, Mac-to-guest jump host access, Mac GUI localhost SSH tunnel.
@@ -27,7 +27,7 @@
 - [x] **P0 development gate** Source, worktrees, reviewed inventory and contracts recorded. Wave 1 released. Remaining host and deployment checks are tracked above. See [P0 baseline report](docs/P0_BASELINE_REPORT.md).
 - [x] **P1** Always-on tests and CMake fixes merged. Full Acer Ubuntu Debug and Release builds and CTest verified for `917a621`.
 - [x] **P2** gRPC and concurrency tests passed on Acer loopback, including bounded shutdown and queue draining. Cross-VM G01 remains pending.
-- [ ] **P3** Docker/Compose and VM setup merged. The `917a621` image gate passed. Host setup, release-image builds and guest rollout are pending.
+- [ ] **P3** Docker/Compose and VM setup merged. The final `acc2114` image build and isolated help checks passed. Guest rollout remains pending.
 - [x] **P4** HTTP Range and READY-only gallery checks passed on Acer loopback. Headful Chrome verified preview and full playback over an isolated tunnel. Cross-VM acceptance remains pending.
 - [ ] **P5** Lifecycle and seeded demo implementation merged. At `acc2114`, seven controller tests and two native rehearsals passed. Run both real guests and verify browser, restart and shutdown behavior.
 - [ ] **P6** Recovery implementation `4fab36e` merged. Native gRPC, restart and saturation tests passed. Verify container and cross-VM recovery.
@@ -36,7 +36,7 @@
 ## Hard acceptance checks
 
 - [x] Full native Acer Ubuntu app builds and CTest passed in Debug and Release at `acc2114`. Native gRPC, recovery and HTTP suites also passed.
-- [x] Built revision-tagged Ubuntu Noble producer and consumer images on the Acer at `917a621`. Revalidate after further source changes.
+- [x] Built and verified both revision-tagged Ubuntu Noble images on the Acer at `acc2114`.
 - [ ] Producer logs prove `p` separate folders/threads; consumer logs prove `c` worker threads.
 - [ ] `q` caps waiting descriptors; `QUEUE_FULL` appears deterministically in real producer output without corrupting accepted uploads.
 - [ ] Real gRPC stream goes VM1 -> VM2 and is received without using a local Docker-only bridge shortcut.
