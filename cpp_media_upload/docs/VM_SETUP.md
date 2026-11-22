@@ -50,6 +50,16 @@ The host package step does not grant broad libvirt or Docker group membership. S
 
 ## Guest network and creation review
 
+The Acer's modular libvirt installation omits the package that creates Ubuntu's locked `libvirt-dnsmasq` account. Check both `getent group libvirt-dnsmasq` and `getent passwd libvirt-dnsmasq` before starting the dedicated network. If either entry is absent, the exact account commands from Ubuntu's `libvirt-daemon-config-network` package can be reviewed and approved separately.
+
+```bash
+sudo addgroup --quiet --system libvirt-dnsmasq
+sudo adduser --quiet --system --ingroup libvirt-dnsmasq --disabled-login --disabled-password \
+  --home /var/lib/libvirt/dnsmasq --no-create-home --gecos "Libvirt Dnsmasq" libvirt-dnsmasq
+```
+
+For a partial run, check the existing group and account and apply only the missing entry. An inactive verified MediaDock network can be started directly after the account exists. Retain its XML, image exports and QCOW2 base for the resumed provisioning.
+
 Review the guest command templates below after verifying the daemon and existing network inventory. Select the approved guest SSH identity and operator administration path before first boot. Reserve host storage only on the current Ubuntu filesystem. These templates require the reviewed live values and exact authorization before applying any host network, VM, guest Docker or SSH changes.
 
 Check all routes, existing libvirt networks and Docker IPAM ranges on the Acer before selecting a subnet and virtual MAC addresses.
