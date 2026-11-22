@@ -13,7 +13,7 @@
 ## Hero Features
 
 * **High-Throughput Concurrent Streaming (`p` Producers, `c` Consumers):** Independent producer threads scan isolated source folders and stream binary video chunks (64 KiB–256 KiB) across VMs via gRPC without buffering entire files in memory. A pool of `c` worker threads concurrently ingests, transcodes, and indexes accepted media.
-* **Bounded Leaky-Bucket Queue with Instant `QUEUE_FULL` Feedback:** Synchronized FIFO queue strictly caps waiting jobs at `q`. When capacity is reached, excess uploads are immediately dropped and reported back to producer clients via a dedicated `QUEUE_FULL` status code, preventing memory starvation.
+* **Bounded FIFO queue with `QUEUE_FULL` feedback:** When `q` jobs are already waiting, the receiver rejects the newly completed upload after transfer and reports `QUEUE_FULL` to its producer. In-flight uploads and active workers have separate limits.
 * **Cryptographic SHA-256 Deduplication:** Computes streaming SHA-256 hashes on the fly during upload. A SQLite partial unique index prevents redundant storage and compute overhead for identical files—even if uploaded under different filenames by separate producers.
 * **Automated FFmpeg Processing & 10-Second Previews:** Background workers validate video streams, transcode non-optimal media to browser-ready H.264/AAC MP4 (CRF 28, `+faststart`), and generate a 10-second muted preview MP4 (`640x360`) plus high-res JPEG poster thumbnails.
 * **Interactive Browser Gallery & HTTP Byte-Range Streaming:** A Drogon C++ HTTP server delivers an interactive web dashboard with real-time queue telemetry, video cards that auto-play 10-second previews on mouse hover, and click-to-play modal playback supporting RFC 7233 HTTP 206 Partial Content byte ranges.
@@ -21,6 +21,21 @@
 ---
 
 ## Quickstart Guide
+
+### Mac demo controller
+
+Complete the [one-time Acer and two-guest setup](docs/VM_SETUP.md), then run from this directory.
+
+```bash
+./demo.sh start
+./demo.sh
+./demo.sh status
+./demo.sh stop
+```
+
+Use the URL printed by the script, normally `http://127.0.0.1:8080`. Stopping both MediaDock VMs releases their memory and preserves the Docker volumes and uploaded videos. See the [demo quickstart](docs/DEMO_QUICKSTART.md) and [current verification results](docs/FINAL_VERIFICATION.md).
+
+### Native build and diagnostics
 
 ### Prerequisites (Ubuntu 24.04 LTS Recommended)
 
@@ -46,7 +61,7 @@ cmake -S . -B build -G Ninja \
   -DBUILD_FULL_APP=ON
 
 # Compile targets
-cmake --build build --parallel $(nproc)
+cmake --build build --parallel 1
 
 # Run verification test suite
 ctest --test-dir build --output-on-failure

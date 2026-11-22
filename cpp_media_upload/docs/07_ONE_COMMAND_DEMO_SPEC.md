@@ -11,7 +11,7 @@ After one-time authorized VM, SSH and Docker setup, run any operation from a fre
 | `./demo.sh stop` | Drain MediaDock jobs, stop MediaDock services, gracefully shut down both owned guests, verify their powered-off state, close the owned tunnel, and report the observed host resource change. Preserve images, volumes, databases, media and evidence. |
 | `./demo.sh status` | Report Acer reachability and resources, both guest states, container states, consumer health, tunnel state and the last evidence location. This operation is read-only. |
 
-P5 implements the terminal script, including `--help`, and uses bounded access without interactive SSH or sudo prompts during normal operation.
+P5 uses a Bash entry point with a Python 3.11+ controller, bounded SSH and immutable libvirt domain enrollment. The two dedicated guest logins operate their own rootless Docker daemons. Normal operation uses key-based SSH and the Acer's fixed-scope noninteractive VM wrapper. See the [demo quickstart](DEMO_QUICKSTART.md).
 
 ### Complete demonstration workflow
 
