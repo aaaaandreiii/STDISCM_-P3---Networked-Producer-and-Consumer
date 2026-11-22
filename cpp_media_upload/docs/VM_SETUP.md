@@ -7,7 +7,7 @@
 | `mediadock-producer`, Ubuntu Server 24.04 amd64 | Guest Docker Engine, one-shot producer and fixture generation | 2 vCPU, 1536 MiB RAM, sparse 12 GiB QCOW2 |
 | `mediadock-consumer`, Ubuntu Server 24.04 amd64 | Independent guest Docker Engine, gallery and gRPC | 2 vCPU, 2560 MiB RAM, sparse 18 GiB QCOW2 |
 
-The Acer passed dedicated-key BatchMode SSH, the native build, and the existing-Docker image gate. The Approval 3 preflight verified AMD-V, read/write access to `/dev/kvm`, and KVM API version 12. Provisioning and the cross-VM rollout are pending.
+The Acer passed dedicated-key BatchMode SSH, the native build, and the existing-Docker image gate. The deployed KVM guests use the dedicated MediaDock NAT network and independent rootless Docker daemons. The Mac's configured Acer and guest aliases provide password-free access through its login SSH agent. The current verified image revision is `9101883`. See the [release verification record](FINAL_VERIFICATION.md) for the installed versions and live results.
 
 ## Approval 3 preflight
 
