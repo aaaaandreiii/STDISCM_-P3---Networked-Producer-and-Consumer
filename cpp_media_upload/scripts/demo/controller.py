@@ -21,7 +21,7 @@ import time
 from urllib.parse import urlsplit
 import os
 
-from checks import BUSY, HEALTH, assert_scenario, get_json, parse_uploads, require
+from checks import BUSY, HEALTH, assert_scenario, get_json, http, parse_uploads, require
 
 ROOT = Path(__file__).resolve().parents[2]
 ROLES = ("producer", "consumer")
@@ -281,9 +281,19 @@ class Controller:
                 require(result.returncode == 0, "Creating the owned tunnel failed: " + errors.read().decode(errors="replace").strip())
         require(self.tunnel_status() == "owned", "Could not verify owned tunnel control socket")
         poll(lambda: self.local_health(), 15, "Consumer health unavailable through owned localhost tunnel")
+        poll(self.local_gallery, 15, "Gallery unavailable through owned localhost tunnel")
 
     def local_health(self):
         return get_json(f"127.0.0.1:{self.local_port}", "/health") == HEALTH
+
+    def local_gallery(self):
+        address = f"127.0.0.1:{self.local_port}"
+        for route, mime in (("/", "text/html"), ("/app.js", "text/javascript"), ("/style.css", "text/css")):
+            status, headers, body = http(address, route)
+            content_type = headers.get("content-type", "").partition(";")[0]
+            require(status == 200 and content_type == mime and body,
+                    f"Gallery route {route} returned HTTP {status} and content type {content_type or 'missing'}")
+        return True
 
     def close_tunnel(self):
         state = self.tunnel_status()

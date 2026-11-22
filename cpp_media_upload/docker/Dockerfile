@@ -56,8 +56,12 @@ LABEL org.opencontainers.image.revision="${IMAGE_REVISION}"
 WORKDIR /opt/mediadock
 COPY --from=builder /build/media_consumer /usr/local/bin/media_consumer
 COPY web/ /opt/mediadock/web/
-# Docker copies the seeded directory into each new named volume.
-RUN install -d -m 0750 -o 10001 -g 10001 /data /data/incoming /data/uploads /data/previews
+# Build input may be staged with umask 077. The unprivileged runtime needs read access.
+RUN chmod -R a+rX /opt/mediadock/web \
+    && install -d -m 0750 -o 10001 -g 10001 /data /data/incoming /data/uploads /data/previews
 USER 10001:10001
+RUN test -r /opt/mediadock/web/index.html \
+    && test -r /opt/mediadock/web/app.js \
+    && test -r /opt/mediadock/web/style.css
 EXPOSE 50051 8080
 ENTRYPOINT ["/usr/local/bin/media_consumer"]

@@ -149,10 +149,21 @@ class LifecycleTests(unittest.TestCase):
 
     def test_forwarded_health_reads_http_response(self):
         class HealthHandler(BaseHTTPRequestHandler):
+            assets = {}
+
             def do_GET(self):
-                self.send_response(200 if self.path == "/health" else 404)
+                if self.path == "/health":
+                    response = (b'{"ok":true,"service":"media-upload-gallery"}', "application/json")
+                else:
+                    response = self.assets.get(self.path)
+                if response is None:
+                    self.send_error(404)
+                    return
+                content, mime = response
+                self.send_response(200)
+                self.send_header("Content-Type", mime + "; charset=utf-8")
                 self.end_headers()
-                self.wfile.write(b'{"ok":true,"service":"media-upload-gallery"}')
+                self.wfile.write(content)
 
             def log_message(self, *args):
                 pass
@@ -164,6 +175,14 @@ class LifecycleTests(unittest.TestCase):
             worker.start()
             try:
                 self.assertTrue(demo.local_health())
+                with self.assertRaisesRegex(RuntimeError, "returned HTTP 404"):
+                    demo.local_gallery()
+                HealthHandler.assets = {
+                    "/": (b"<html></html>", "text/html"),
+                    "/app.js": (b"// script", "text/javascript"),
+                    "/style.css": (b"/* style */", "text/css"),
+                }
+                self.assertTrue(demo.local_gallery())
             finally:
                 server.shutdown()
                 worker.join()
