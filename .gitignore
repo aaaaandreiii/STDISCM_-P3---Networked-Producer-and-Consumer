@@ -10,3 +10,7 @@ build/
 build-*/
 *.log
 *.part
+
+# IDE settings
+.vscode/
+
