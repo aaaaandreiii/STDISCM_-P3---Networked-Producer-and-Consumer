@@ -29,13 +29,13 @@
 - [x] **P2** gRPC and concurrency tests passed on Acer loopback, including bounded shutdown and queue draining. Cross-VM G01 remains pending.
 - [ ] **P3** Docker/Compose and VM setup merged. The `917a621` image gate passed. Host setup, release-image builds and guest rollout are pending.
 - [x] **P4** HTTP Range and READY-only gallery checks passed on Acer loopback. Headful Chrome verified preview and full playback over an isolated tunnel. Cross-VM acceptance remains pending.
-- [ ] **P5** Lifecycle and seeded demo implementation `1e0d61d` merged. Controller tests passed. Run both real guests and verify browser, restart and shutdown behavior.
+- [ ] **P5** Lifecycle and seeded demo implementation merged. At `acc2114`, seven controller tests and two native rehearsals passed. Run both real guests and verify browser, restart and shutdown behavior.
 - [ ] **P6** Recovery implementation `4fab36e` merged. Native gRPC, restart and saturation tests passed. Verify container and cross-VM recovery.
 - [ ] **P7** Master merge, two-VM full acceptance, final README/build/test docs, offline demo rehearsal and freeze.
 
 ## Hard acceptance checks
 
-- [x] Full native Acer Ubuntu app builds and CTest passed in Debug and Release at `917a621`. Rerun affected checks at the final integration gate.
+- [x] Full native Acer Ubuntu app builds and CTest passed in Debug and Release at `acc2114`. Native gRPC, recovery and HTTP suites also passed.
 - [x] Built revision-tagged Ubuntu Noble producer and consumer images on the Acer at `917a621`. Revalidate after further source changes.
 - [ ] Producer logs prove `p` separate folders/threads; consumer logs prove `c` worker threads.
 - [ ] `q` caps waiting descriptors; `QUEUE_FULL` appears deterministically in real producer output without corrupting accepted uploads.
