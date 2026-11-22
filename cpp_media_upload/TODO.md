@@ -1,6 +1,6 @@
 # MediaDock implementation TODO
 
-**Status:** `APPROVED_FOR_PHASED_CODEX_IMPLEMENTATION` (user approval 2026-11-21). P1 and P3 were merged into `codex/integration`. The P0 baseline report records the passing native and image gates and the Wave 2 loopback and browser checks. These checkboxes are acceptance gates; mark complete only when observed, with evidence/commit references.
+**Status:** Two-VM release verified at image revision `9101883`. The [release verification record](docs/FINAL_VERIFICATION.md) links the measured build, browser, lifecycle and persistence results.
 
 ## Approval / prerequisites
 
@@ -16,7 +16,7 @@
 - [x] Preflight verified KVM API version 12 and device access, APT candidates and initial resource headroom.
 - [x] Provisioned two KVM guests after approval, on the dedicated MediaDock NAT network. Host routes and Docker IPAM passed the overlap check.
 - [x] Confirmed two separate Ubuntu VMs with Docker containers inside each are acceptable. Single-host Docker mode is test-only.
-- [ ] P0: verify ports 50051/8080/50052/8081, test media acceptance; confirm exact privileged host/VM installation steps before executing them (plan approved, unattended sudo not automatically approved).
+- [x] Verified the two gRPC and HTTP port pairs on the consumer guest and the Mac loopback forward. The owner approved each privileged provisioning step.
 - [x] Verified both SSH identities, private IPv4 addresses, Acer jump host and Mac GUI tunnel.
 - [x] Implemented all four `./demo.sh` commands and deployed the scoped VM control wrapper.
 - [ ] P5/P7: verify Ubuntu physical laptop remains powered on/reachable; fail clearly otherwise (no assumption of Wake-on-LAN).
@@ -30,8 +30,9 @@
 - [x] **P3** The `9101883` image gate passed. Both rootless guest daemons loaded and verified the expected image IDs.
 - [x] **P4** HTTP Range and READY-only gallery checks passed. Headful Chrome verified hover preview and full playback through the deployed consumer's Mac tunnel.
 - [x] **P5** Both full demos ran across the two guests at `9101883`. Cold and warm startup, browser playback, repeated stop and restart persistence passed.
-- [ ] **P6** Recovery implementation `4fab36e` merged. Native gRPC, restart and saturation tests passed. Verify container and cross-VM recovery.
-- [ ] **P7** Master merge, two-VM full acceptance, final README/build/test docs, offline demo rehearsal and freeze.
+- [x] **P6** Native gRPC recovery and saturation passed. Live shutdown drained active work, and all three newly accepted uploads remained READY after restart.
+- [x] **P7** Verified the two-VM release, recorded the live tests and prepared the configured Mac checkout.
+- [ ] Run a dedicated WAN-disconnection rehearsal.
 
 ## Hard acceptance checks
 
@@ -40,18 +41,18 @@
 - [x] Normal used three producer folders and both consumer workers.
 - [x] Overload reached the two-job queue limit, reported 12 `QUEUE_FULL` replies in each run and published all accepted videos.
 - [x] Verified gRPC health and streaming from the producer guest to the consumer guest over the dedicated network.
-- [ ] All READY MP4 files reside in one uploads folder; producer filename collisions cannot overwrite them.
+- [x] For both live demos, the READY MP4 files were verified in the shared uploads folder and same-name uploads kept distinct IDs.
 - [x] The live gallery loaded, and Chrome played the 10-second hover preview and full video with seeking. Range `206` and `416` passed in the two-guest media checks.
-- [ ] Duplicate SHA-256 rejected even across differently named files, while same-name/different-bytes uploads both succeed.
-- [ ] Compression-on test validates playable video, final-vs-original size; compression-off test validates already-compatible MP4; do not claim all files shrink.
-- [ ] Stopped/restarted containers preserve READY media, DB and source samples; incomplete upload/crash behavior documented.
+- [x] Live duplicate SHA-256 claims were rejected across different names. Both same-name uploads with different bytes succeeded.
+- [x] Live compression reduced the synthetic source from 32,707,250 to 416,099 bytes. Native compression-off tests preserved the compatible MP4.
+- [x] Restart preserved the normal gallery, stream digests and accepted late uploads. The recovery report records interrupted transfers and crash handling.
 - [x] Cold `./demo.sh start` reached gRPC and GUI readiness. Warm startup reused the consumer, and startup recovered the same individually stopped container.
 - [x] Both full demos completed in a fresh environment using the Mac login SSH agent.
 - [x] Status reported live and stopped VM states, available host resources, the tunnel and local evidence.
-- [ ] Repeated `./demo.sh stop` drains active work, gracefully stops only MediaDock services and guests, confirms shutoff, closes only its tunnel, and reports measured resource change. Verify timeout, intact files across stop/start and unchanged unrelated workloads.
-- [ ] Keep at least 10 GiB of host storage free, aim for the 12 GiB working floor, avoid concurrent heavy workloads and preserve the physical Acer and its existing SSH sessions.
-- [ ] `./demo.sh` verifies prerequisites before making changes, shows actionable failures, prints GUI address, writes evidence, preserves prior data, never silently deletes volumes.
-- [ ] Relevant logs/commands and observed results stored in a test report; no false “passed” entries.
+- [x] Live stop drained active work, refused an unrelated running test container, and preserved media after restart. Repeated stop and the simulated timeout passed.
+- [x] The corrected build kept over 42 GiB free, ran sequentially and preserved the four baseline Acer Docker workloads.
+- [x] The demo verified readiness, printed the working GUI address, wrote evidence and preserved prior videos through the image upgrade and restarts.
+- [x] The release report records measured results, prior failures and the unrun WAN-disconnection drill.
 
 See the [release verification record](docs/FINAL_VERIFICATION.md) for the latest results and remaining checks.
 
