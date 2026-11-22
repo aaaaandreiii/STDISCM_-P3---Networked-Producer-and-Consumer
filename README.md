@@ -47,6 +47,8 @@ STDISCM PS3/
 
 ## Quick Navigation
 
+For the two-VM demo, finish the [one-time Acer setup](cpp_media_upload/docs/VM_SETUP.md) and configure `.env.demo` using the [Mac quickstart](cpp_media_upload/docs/DEMO_QUICKSTART.md). From `cpp_media_upload/`, run `./demo.sh`. The Mac opens the gallery through the managed localhost tunnel. Run `./demo.sh stop` when finished to release both VMs and preserve the uploaded videos.
+
 | Document | Primary Audience | Core Focus |
 |---|---|---|
 | [**`cpp_media_upload/docs/README.md`**](cpp_media_upload/docs/README.md) | First-time visitors | Quick summary, hero features, and navigation |

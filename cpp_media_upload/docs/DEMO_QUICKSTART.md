@@ -13,7 +13,7 @@ After [one-time Acer and guest setup](VM_SETUP.md), run the following commands f
 
 Copy `.env.demo.example` to `.env.demo` and fill in the owners' verified settings. Entries use plain `KEY=value` lines. Keep SSH credentials and this configuration out of Git.
 
-- Set `UBUNTU_LAPTOP_SSH`, `PRODUCER_SSH` and `CONSUMER_SSH` to the three verified SSH aliases. The guest aliases use the Acer as their jump host. Check each alias from the Mac with `ssh -o BatchMode=yes -o StrictHostKeyChecking=yes <alias> hostname` when the guests are provisioned and running.
+- Set `UBUNTU_LAPTOP_SSH`, `PRODUCER_SSH` and `CONSUMER_SSH` to the three verified SSH aliases. The guest aliases use the Acer as their jump host. Check each alias from the Mac with `ssh -o BatchMode=yes -o StrictHostKeyChecking=yes <alias> hostname` when the guests are provisioned and running. Keep the dedicated key loaded in the Mac login SSH agent for password-free use from each Terminal.
 - Set `CONSUMER_PRIVATE_IP` to the consumer's reserved address and copy each guest's `/etc/machine-id` into the matching configuration field. Set `IMAGE_REVISION` to the full deployed SHA. Confirm its stamped release is present on both guests and the corresponding image is already loaded in each rootless Docker daemon.
 - Use the default GUI address `http://127.0.0.1:8080` or set `GUI_BASE_URL` to another unused local port. Keep the Acer alias free of its own forwards. The GUI shows normal service after the default command finishes.
 

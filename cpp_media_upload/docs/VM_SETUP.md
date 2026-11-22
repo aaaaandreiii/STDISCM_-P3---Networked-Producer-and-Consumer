@@ -206,7 +206,7 @@ test ! -e /etc/sudoers.d/mediadock-vmctl
 sudo install -d -m 0755 -o root -g root /etc/mediadock
 for domain in mediadock-producer mediadock-consumer; do
   test ! -e "/etc/mediadock/$domain.uuid"
-  cmp <(sudo virsh -c qemu:///system domuuid "$domain") "$domain.uuid"
+  [[ $(sudo virsh -c qemu:///system domuuid "$domain") == "$(cat "$domain.uuid")" ]]
   sudo install -o root -g root -m 0644 "$domain.uuid" "/etc/mediadock/$domain.uuid"
 done
 sudo install -o root -g root -m 0755 "$VM_SCRIPTS/mediadock-vmctl" /usr/local/sbin/mediadock-vmctl
